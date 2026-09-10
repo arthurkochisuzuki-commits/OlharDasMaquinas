@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureVision AI - Painel de Vigilância Integrado 24H</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+      <div>
+        <div class="brand-section">
+          <div class="brand-title">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            SecureVision AI
+          </div>
+          <div class="vigilance-badge">• VIGILANCE LEVEL: HIGH</div>
+        </div>
+
+        <ul class="nav-list">
+          <li class="nav-item" data-tab="status">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            System Status
+          </li>
+          <li class="nav-item active" data-tab="monitoring">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            Monitoring
+          </li>
+          <li class="nav-item" data-tab="enrollment">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
+            Enrollment (LGPD)
+          </li>
+          <li class="nav-item" data-tab="logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Logs & Audits
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <ul class="nav-list" style="margin-bottom: 16px;">
+          <li class="nav-item" data-tab="settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Settings
+          </li>
+          <li class="nav-item" data-tab="support">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            Support
+          </li>
+        </ul>
+
+        <div class="user-profile-card">
+          <div class="user-avatar">SC</div>
+          <div class="user-info">
+            <span class="user-name">S. Carter</span>
+            <span class="user-role">AUTH: Lvl 5 (Admin)</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <main class="main-wrapper">
+      <!-- Top Navbar -->
+      <header class="top-header">
+        <div class="header-metrics">
+          <div class="metric-item">
+            <span class="metric-label">FPS (AVG)</span>
+            <span class="metric-value" id="metricFps">59.8</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">EDGE GPU</span>
+            <span class="metric-value" id="metricGpu">82%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">ACTIVE STREAMS</span>
+            <span class="metric-value" id="activeStreamsCount" style="color: var(--text-main);">1 / 4</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <div class="search-box">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" placeholder="Search camera feeds, logs, pers...">
+          </div>
+          <button class="btn-icon" id="btnHeaderSettings" title="Configurações do Sistema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></button>
+          <button class="btn-icon" title="Notificações"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></button>
+        </div>
+      </header>
+
+      <div class="content-body">
+        <!-- Dashboard Center Area -->
+        <div class="dashboard-center">
+          
+          <!-- TAB: SYSTEM STATUS -->
+          <div class="tab-section" id="tab-status">
+            <div style="margin-bottom:24px;">
+              <h2 style="font-size:1.4rem; color:var(--text-main); margin-bottom:4px; font-weight:600;">📊 System Status — Painel de Controle em Tempo Real</h2>
+              <p style="color:var(--text-muted); font-size:0.9rem;">Informações detalhadas sobre reconhecimento facial, sincronização em nuvem, métricas de desempenho e diagnóstico.</p>
+            </div>
+            
+            <div class="settings-grid">
+              
+              <!-- Card 1 -->
+              <div class="settings-card">
+                <div class="settings-card-title">🔗 Sincronização Supabase Cloud</div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Status de Conexão</span>
+                  <span class="status-metric-value" id="stsSupabaseStatus">Verificando...</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">URL do Projeto</span>
+                  <span class="status-metric-value mono" id="stsSupabaseUrl" style="color:var(--text-dim);">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Chave API</span>
+                  <span class="status-metric-value" id="stsSupabaseKeyStatus">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Última Sincronização</span>
+                  <span class="status-metric-value" id="stsLastSync">Nunca</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Registros Sincronizados</span>
+                  <span class="status-metric-value" id="stsSyncCount">0</span>
+                </div>
+                <button class="btn-action" id="btnStatusSyncNow" style="width:100%; justify-content:center; margin-top:8px;">🔄 Sincronizar Agora</button>
+              </div>
+
+              <!-- Card 2 -->
+              <div class="settings-card">
+                <div class="settings-card-title">🧠 Reconhecimento Facial em Tempo Real</div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Estado do Motor ArcFace</span>
+                  <span class="status-metric-value" id="stsArcFaceEngine">Inicializando...</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Pessoa na Câmera</span>
+                  <span class="status-metric-value" id="stsPersonDetected">Nenhuma</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Resultado da Identificação</span>
+                  <span class="status-metric-value" id="stsIdentityResult" style="font-weight:700;">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Nome Identificado</span>
+                  <span class="status-metric-value" id="stsIdentityName">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Similaridade Cosseno (ArcFace)</span>
+                  <span class="status-metric-value mono" id="stsCosineValue">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Confiança Biométrica</span>
+                  <span class="status-metric-value mono" id="stsConfidenceValue">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Margem Angular (s·φ)</span>
+                  <span class="status-metric-value mono" id="stsMarginLogit">—</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Threshold Ativo</span>
+                  <span class="status-metric-value mono" id="stsThreshold">0.68</span>
+                </div>
+              </div>
+
+              <!-- Card 3 -->
+              <div class="settings-card">
+                <div class="settings-card-title">📦 Banco de Dados Biométrico</div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Pessoas Cadastradas</span>
+                  <span class="status-metric-value" id="stsRegisteredCount">0</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Total de Fontes Biométricas</span>
+                  <span class="status-metric-value" id="stsTotalSources">0</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Conformidade LGPD</span>
+                  <span class="status-metric-value online" id="stsLgpdStatus">Ativo (Lei 13.709/2018)</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Motor de Encriptação</span>
+                  <span class="status-metric-value online">AES-256-GCM via Web Crypto API</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Banco Local</span>
+                  <span class="status-metric-value">IndexedDB (SecureVision_LocalDB)</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Banco Nuvem</span>
+                  <span class="status-metric-value" id="stsCloudDb">Supabase PostgreSQL</span>
+                </div>
+              </div>
+
+              <!-- Card 4 -->
+              <div class="settings-card">
+                <div class="settings-card-title">⚡ Desempenho e Hardware</div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Resolução de Processamento</span>
+                  <span class="status-metric-value">160×120 px (subsampled)</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Taxa de Amostragem Facial</span>
+                  <span class="status-metric-value" id="stsSampleRate">~16 FPS</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Dimensão do Embedding</span>
+                  <span class="status-metric-value">128-D (Float32)</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Câmeras Ativas</span>
+                  <span class="status-metric-value" id="stsActiveCams">0 / 4</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Pausa Automática</span>
+                  <span class="status-metric-value online" id="stsAutoPause">Ativa</span>
+                </div>
+                <div class="status-metric-row">
+                  <span class="status-metric-label">Sintetizador de Voz</span>
+                  <span class="status-metric-value" id="stsVoiceStatus">Ativo (pt-BR)</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Section C -->
+            <div style="margin-top:24px;">
+              <h3 style="font-size:1.1rem; color:var(--text-main); margin-bottom:12px; font-weight:600;">📈 Linha do Tempo de Reconhecimento (Últimos Eventos)</h3>
+              <div id="stsRecognitionTimeline" style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:12px; max-height:220px; overflow-y:auto;"></div>
+            </div>
+          </div>
+          
+          <!-- TAB 1: MONITORING -->
+          <div class="tab-section active" id="tab-monitoring">
+            
+            <!-- PAINEL EM TEMPO REAL: STATUS DE IDENTIDADE E PAUSA AUTOMÁTICA -->
+            <div class="identity-status-banner paused" id="realtimeIdentityBanner">
+              <div class="identity-info-group">
+                <div style="font-size:1.8rem;" id="identityStatusIcon">⏸️</div>
+                <div>
+                  <div class="identity-badge-title" id="identityStatusTitle" style="color:var(--text-dim);">
+                    NENHUMA PESSOA DETECTADA NA CÂMERA
+                  </div>
+                  <div class="identity-subtext" id="identityStatusSub">
+                    Sistema em Pausa Automática (Economizando recursos de CPU/GPU). Aguardando presença em frente à câmera.
+                  </div>
+                </div>
+              </div>
+              <div class="badge-secure" id="identityStatusBadge" style="background:rgba(100,116,139,0.15); border-color:#64748b; color:#94a3b8;">
+                PAUSADO
+              </div>
+            </div>
+
+            <!-- Control Toolbar -->
+            <div class="control-bar">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <button class="btn-action" id="btnCheckCameras">
+                  🔍 Verificar Câmeras Conectadas
+                </button>
+                <div style="font-size:0.8rem; color:var(--accent-cyan); font-weight:600; background:rgba(6,182,212,0.1); padding:4px 10px; border-radius:4px; border:1px solid rgba(6,182,212,0.3);">
+                  🔍 Reconhecimento Biométrico DB ArcFace 24H
+                </div>
+              </div>
+
+              <div style="font-size:0.75rem; color:var(--text-muted);">Sintetizador de Voz: Ativo</div>
+            </div>
+
+            <!-- 4 Camera Grid -->
+            <div class="camera-grid">
+              
+              <!-- Feed 1: Main Lobby (DYNAMIC FACE TRACKER) -->
+              <div class="camera-card" id="cardCam1">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam1">CAM_01 · Main Lobby</span>
+                  <span style="color:#10b981; font-size:0.7rem; font-weight:700;" id="statusCam1">● LIVE STREAM</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam1">
+                  <video class="cam-video" id="videoFeedCam1" autoplay muted playsinline></video>
+                  <canvas class="cam-canvas" id="canvasFeedCam1"></canvas>
+                  
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay1" style="display:none;">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Nenhum dispositivo de vídeo USB ou RTSP ativo neste slot.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feed 2: Server Rm B -->
+              <div class="camera-card" id="cardCam4">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam4">CAM_04 · Server Rm B</span>
+                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam4">DISCONNECTED</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam4">
+                  <video class="cam-video" id="videoFeedCam4" autoplay muted playsinline style="display:none;"></video>
+                  <canvas class="cam-canvas" id="canvasFeedCam4" style="display:none;"></canvas>
+
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay4">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Conecte uma webcam física ou câmera de segurança IP/RTSP.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feed 3: Vault Stream -->
+              <div class="camera-card" id="cardCam3">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam3">CAM_03 · Infra Vault Thermal</span>
+                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam3">DISCONNECTED</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam3">
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay3">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Sem transmissão ativa para este setor.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feed 4: North Turnstiles -->
+              <div class="camera-card" id="cardCam2">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam2">CAM_02 · North Turnstiles</span>
+                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam2">DISCONNECTED</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam2">
+                  <canvas class="cam-canvas" id="canvasFeedCam2" style="display:none;"></canvas>
+                  
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay2">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Aguardando sinal de vídeo do dispositivo de entrada.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Bottom System Integrity Monitor Bar -->
+            <div class="integrity-bar">
+              <div class="integrity-info">
+                <svg class="integrity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                <div>
+                  <div class="integrity-title">System Integrity Monitor</div>
+                  <div class="integrity-sub">NODE_CLUSTER_ALPHA · Last Check: <span id="lastCheckTime">0.2s ago</span></div>
+                </div>
+              </div>
+
+              <div class="integrity-stats">
+                <div>
+                  <div style="color:var(--text-dim);">FILES SCANNED</div>
+                  <div style="font-weight:700; color:var(--text-main); font-size:0.9rem;" id="filesScannedCount">1,482</div>
+                </div>
+                <div>
+                  <div style="color:var(--text-dim);">CORE MODULES</div>
+                  <div class="integrity-sub" id="coreModulesText">✓ kernel_sys.dll OK <br> ✓ auth_module.so OK</div>
+                </div>
+                <div class="badge-secure" id="integrityStatusBadge">SECURE</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- TAB 2: ENROLLMENT (CADASTRO LGPD MULTI-FONTE) -->
+          <div class="tab-section" id="tab-enrollment">
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 24px;">
+              <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 6px;">Módulo de Cadastro Biométrico Multi-Fonte (LGPD)</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+                Ao realizar o cadastro abaixo, a pessoa passa a ser reconhecida como <strong>[AUTORIZADA]</strong> no sistema de câmeras.
+              </p>
+
+              <form id="enrollmentForm" style="width:100%; box-sizing:border-box;">
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; width:100%; box-sizing:border-box;">
+                  <div style="min-width:0;">
+                    <div class="form-group">
+                      <label>Nome Completo do Colaborador *</label>
+                      <input type="text" class="form-control" id="enrollName" required placeholder="Ex: usuario teste">
+                    </div>
+
+                    <div class="form-group">
+                      <label>Cargo / Departamento</label>
+                      <input type="text" class="form-control" id="enrollRole" placeholder="Ex: Engenharia de Software">
+                    </div>
+
+                    <div class="form-group">
+                      <label>CPF (Criptografado com Passphrase AES-256) *</label>
+                      <input type="text" class="form-control" id="enrollCpf" required placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+                      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Restrição: Apenas números (limite de 11 dígitos, formatação 000.000.000-00).</div>
+                    </div>
+                  </div>
+
+                  <div style="min-width:0; width:100%; box-sizing:border-box; overflow:hidden;">
+                    <label style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Fontes Biométricas da Face (Múltiplas fotos/Vídeo)</label>
+                    <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:6px; display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; box-sizing:border-box; overflow:hidden;">
+                      <video id="enrollmentWebcamPreview" style="width:200px; height:130px; background:#000; border-radius:6px; object-fit:cover; flex-shrink:0;" autoplay muted playsinline></video>
+                      
+                      <div style="display:flex; gap:10px; flex-shrink:0;">
+                        <button type="button" class="btn-action" id="btnCapturePhoto" style="font-size:0.75rem;">📷 Capturar Foto Ângulo</button>
+                        <button type="button" class="btn-outline" id="btnRecordVideo" style="font-size:0.75rem;">🎥 Gravar Vídeo (3s)</button>
+                      </div>
+
+                      <div id="sourcesCapturedCount" style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan); flex-shrink:0;">0 / 3 Fotos Biométricas Capturadas</div>
+                      
+                      <!-- Carrossel de fotos: largura 100%, fixo e arrastável horizontalmente -->
+                      <div class="media-source-preview" id="mediaSourcesContainer" title="Arraste para os lados ou use a roda do mouse para visualizar todas as fotos"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- termo LGPD -->
+                <div style="margin-top:20px;">
+                  <label style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Termo de Consentimento Biométrico (Art. 7º e 11º da LGPD - Lei 13.709/2018)</label>
+                  <div class="lgpd-box">
+                    <strong>DECLARAÇÃO DE CONSENTIMENTO EXPLICITO PARA TRATAMENTO DE DADOS BIOMÉTRICOS:</strong><br>
+                    Ao marcar a caixa abaixo, o titular concorda expressamente que o sistema <strong>SecureVision AI</strong> realize a coleta, extração de vetores faciais e armazenamento de suas imagens e vídeos biométricos exclusivamente para a finalidade de <em>Controle de Acesso e Segurança de Informação 24H</em>. O titular declara estar ciente de que pode solicitar a EXCLUSÃO DEFINITIVA (expurgo total) de suas mídias a qualquer momento através do painel de administração.
+                  </div>
+                  <label style="display:flex; align-items:center; gap:10px; font-size:0.85rem; color:var(--text-main); cursor:pointer;">
+                    <input type="checkbox" id="lgpdConsentCheckbox" required style="width:18px; height:18px; accent-color:var(--accent-blue);">
+                    Declaro que li e aceito os termos do consentimento LGPD para salvamento de biometria e criptografia de dados.
+                  </label>
+                </div>
+
+                <div class="modal-footer" style="margin-top:20px; display:flex; gap:12px; flex-wrap:wrap;">
+                  <button type="submit" id="btnSubmitAuthorized" class="btn-action" style="padding:10px 22px; font-size:0.9rem;">
+                    💾 Salvar Cadastro Autorizado
+                  </button>
+                  <button type="button" id="btnSubmitBlocked" class="btn-outline" style="padding:10px 22px; font-size:0.9rem; color:#ef4444; border-color:#ef4444; background:rgba(239,68,68,0.08); font-weight:700; cursor:pointer;">
+                    🚫 Cadastrar Pessoa Bloqueada
+                  </button>
+                </div>
+              </form>
+
+              <hr style="border:0; border-top:1px solid var(--border-color); margin: 30px 0;">
+
+              <h3 style="font-size:1.0rem; font-weight:700; margin-bottom:12px;">Pessoas Cadastradas & Gestão de Direitos do Titular (LGPD)</h3>
+              <div id="registeredUsersList"></div>
+            </div>
+          </div>
+
+          <!-- TAB 3: SETTINGS (PAINEL COMPLETO DE CONFIGURAÇÕES) -->
+          <div class="tab-section" id="tab-settings">
+            <div style="margin-bottom: 20px;">
+              <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--text-main);">⚙️ Painel de Configurações do Sistema</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">Personalize a interface, preferências de tema, tolerância biométrica e parâmetros de rede.</p>
+            </div>
+
+            <div class="settings-grid">
+              
+              <!-- Card 1: Aparência e Tema -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+                  Aparência e Tema Visual
+                </div>
+
+                <div class="form-group">
+                  <label>Tema da Interface</label>
+                  <select class="form-control" id="themeSelect">
+                    <option value="dark">🌙 Modo Escuro (Cyber Dark Navy)</option>
+                    <option value="light">☀️ Modo Claro (Clean Security Theme)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>Sintetizador de Voz (Anúncio Falado)</label>
+                  <select class="form-control" id="voiceToggleSelect">
+                    <option value="enabled">🔊 Ativado (Anunciar Pessoas e Alertas por Voz)</option>
+                    <option value="disabled">Mudo (Apenas Alertas Visuais)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Card 2: Parâmetros Biométricos & IA -->
+              <!-- Card 2: Calibração da Câmera & Filtro Anti-Falso Positivo de Fundo -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                  Calibração da Câmera & Filtro de Fundo
+                </div>
+
+                <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:12px;">
+                  Evita que paredes, móveis de madeira, sombras ou iluminação quente sejam confundidos com rostos humanos.
+                </p>
+
+                <div class="form-group">
+                  <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+                    <label style="margin:0;">Densidade Facial Mínima (Filtro Anti-Fundo)</label>
+                    <span id="valMinFacePixels" style="font-weight:700; color:var(--accent-cyan);">110 px</span>
+                  </div>
+                  <input type="range" min="40" max="350" value="110" step="5" class="form-control" id="minFacePixelsRange">
+                  <div style="font-size:0.72rem; color:var(--text-muted); display:flex; justify-content:space-between; margin-top:2px;">
+                    <span>Sensível (Pode pegar móveis)</span>
+                    <span>Rigoroso (Ignora fundos)</span>
+                  </div>
+                </div>
+
+                <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:6px; padding:10px; margin-bottom:12px;">
+                  <div style="display:flex; justify-content:space-between; font-size:0.78rem; margin-bottom:6px;">
+                    <span style="color:var(--text-muted);">Densidade de Pixels Atual na Câmera:</span>
+                    <span id="lblLiveDetectedPixels" style="font-family:var(--font-mono); color:var(--text-main); font-weight:700;">0 px</span>
+                  </div>
+                  <div id="bgCalibBadge" style="font-size:0.72rem; color:var(--text-dim);">Subtração de Fundo: Desativada (Padrão)</div>
+                </div>
+
+                <div style="display:flex; gap:8px;">
+                  <button type="button" class="btn-action" id="btnCalibrateBg" style="font-size:0.75rem; flex:1; justify-content:center;">
+                    📸 Calibrar Fundo Vazio
+                  </button>
+                  <button type="button" class="btn-outline" id="btnResetBgCalib" style="font-size:0.75rem; justify-content:center;">
+                    🔄 Resetar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card 3: Notificações e Alertas -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                  Alertas e Som de Segurança
+                </div>
+
+                <div class="form-group">
+                  <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" checked style="width:16px; height:16px;">
+                    Emitir Alerta Sonoro ao detectar Pessoa Não Autorizada
+                  </label>
+                </div>
+
+                <div class="form-group">
+                  <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" checked style="width:16px; height:16px;">
+                    Registrar log automático de Auditoria a cada alteração
+                  </label>
+                </div>
+              </div>
+
+              <!-- Card 4: Supabase Nuvem -->
+              <div class="settings-card">
+                <div class="settings-card-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"></path></svg>
+                  Supabase Cloud Bridge (Sincronização em Nuvem)
+                </div>
+
+                <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:12px;">
+                  Interligação direta entre o banco IndexedDB local e seu projeto no <strong>Supabase Cloud</strong>. Sincroniza fotos, vetores ArcFace e auditoria LGPD.
+                </p>
+
+                <div class="form-group">
+                  <label>Supabase Project URL</label>
+                  <input type="text" class="form-control" id="supabaseUrlInput" placeholder="https://zsbifogfvfueunwopuuy.supabase.co">
+                </div>
+
+                <div class="form-group">
+                  <label>Supabase Anon Key (API Key)</label>
+                  <input type="password" class="form-control" id="supabaseKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+                </div>
+
+                <button class="btn-action" id="btnSaveSupabase" style="width:100%; justify-content:center; margin-top:6px;">💾 Salvar & Sincronizar Supabase</button>
+              </div>
+
+              <!-- Card 5: Limpeza & Manutenção de Dados (Sem alterar tabelas) -->
+              <div class="settings-card">
+                <div class="settings-card-title" style="color:#ef4444;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  Limpeza de Dados do Banco (Preserva Tabelas)
+                </div>
+
+                <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:14px;">
+                  Limpe os registros do sistema sem excluir ou alterar a estrutura das tabelas no IndexedDB e Supabase.
+                </p>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <div>
+                    <button type="button" class="btn-outline" id="btnClearLogsBtn" style="width:100%; justify-content:center; color:#f59e0b; border-color:rgba(245,158,11,0.4); font-size:0.8rem; padding:8px;">
+                      🧹 Limpar Mensagens de Logs / Histórico
+                    </button>
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Apaga as mensagens do histórico da central mantendo a tabela pronta.</div>
+                  </div>
+
+                  <div>
+                    <button type="button" class="btn-outline" id="btnClearUsersBtn" style="width:100%; justify-content:center; color:#ef4444; border-color:rgba(239,68,68,0.4); font-size:0.8rem; padding:8px;">
+                      🗑️ Limpar Todos os Usuários e Biometrias
+                    </button>
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">Esvazia os cadastros e vetores faciais mantendo a estrutura da tabela.</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Logs Sidebar (Live Security Log) -->
+        <aside class="right-logs-panel">
+          <div class="logs-header">
+            <span class="logs-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              Live Security Log
+            </span>
+            <span style="font-size:0.75rem; color:var(--accent-blue); cursor:pointer;">Filter</span>
+          </div>
+
+          <div class="logs-list" id="liveLogsList">
+            <!-- Populated dynamically from app.js -->
+          </div>
+        </aside>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Modal: Verificar Câmeras Conectadas -->
+  <div class="modal-backdrop" id="cameraCheckModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">🔍 Câmeras e Dispositivos Conectados</div>
+        <button class="btn-icon" onclick="document.getElementById('cameraCheckModal').classList.remove('active')">✕</button>
+      </div>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">
+        Verificação em tempo real do barramento de mídia (`navigator.mediaDevices.enumerateDevices`). Selecione um dispositivo para associar aos feeds do painel.
+      </p>
+      <div id="connectedDeviceList"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="document.getElementById('cameraCheckModal').classList.remove('active')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="db.js"></script>
+  <script src="biometrics.js"></script>
+  <script src="integrity.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
