@@ -209,10 +209,10 @@ class SecureVisionDB {
   async saveUser(userData, biometricSources) {
     if (!this.db) await this.init();
 
-    const userId = userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-    const cleanCpf = (userData.cpf || '').replace(/\D/g, '') || ('CPF_GEN_' + userId);
+    const cleanCpf = (userData.cpf || '').replace(/\D/g, '');
     const encryptedCpf = await this.encryptData(cleanCpf);
-    const cpfHash = await this.hashSHA256(cleanCpf + '_' + userId);
+    const cpfHash = await this.hashSHA256(cleanCpf);
+    const userId = userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
     const isBlocked = !!userData.isBlocked || userData.accessLevel === 'BLOQUEADO';
     const accessLevel = isBlocked ? 'BLOQUEADO' : (userData.accessLevel || 'Nível 1 (Autorizado)');
@@ -241,7 +241,9 @@ class SecureVisionDB {
     const rawBiometricData = {
       descriptors: biometricSources.descriptors || [],
       photoBlobs: biometricSources.photoBlobs || [],
-      videoBlob: biometricSources.videoBlob || null
+      facePatches16x16: biometricSources.facePatches16x16 || [],
+      videoBlob: biometricSources.videoBlob || null,
+      yolo16x16: true
     };
 
     const encryptedBiometricPayload = await this.encryptData(JSON.stringify(rawBiometricData));
@@ -286,46 +288,61 @@ class SecureVisionDB {
       const userStore = tx.objectStore('users');
       const bioStore = tx.objectStore('biometrics');
 
-      const users = [];
+      const rawUsers = [];
+      const bioPromises = [];
+
       const userReq = userStore.openCursor();
 
-      userReq.onsuccess = async (e) => {
+      userReq.onsuccess = (e) => {
         const cursor = e.target.result;
         if (cursor) {
           const u = cursor.value;
-          bioStore.get(u.id).onsuccess = async (be) => {
-            const bioEntry = be.target.result || {};
-            
-            // Decrypt encrypted_payload if present
-            if (bioEntry.encrypted_payload) {
-              try {
-                const decryptedStr = await this.decryptData(bioEntry.encrypted_payload);
-                if (decryptedStr) {
-                  const parsed = JSON.parse(decryptedStr);
-                  u.biometrics = {
-                    descriptors: parsed.descriptors || [],
-                    photoBlobs: parsed.photoBlobs || [],
-                    videoBlob: parsed.videoBlob || null,
-                    sourceCount: bioEntry.sourceCount || 1,
-                    updatedAt: bioEntry.updatedAt
-                  };
-                } else {
-                  u.biometrics = { descriptors: [], photoBlobs: [], sourceCount: bioEntry.sourceCount || 1 };
-                }
-              } catch (err) {
-                console.warn('[DB] Failed to decrypt biometric payload for user:', u.id, err);
-                u.biometrics = { descriptors: [], photoBlobs: [], sourceCount: bioEntry.sourceCount || 1 };
-              }
-            } else {
-              // Backward compatibility for unencrypted records
-              u.biometrics = bioEntry;
-            }
-
-            users.push(u);
-          };
+          rawUsers.push(u);
+          const bioReq = bioStore.get(u.id);
+          bioPromises.push(new Promise((resBio) => {
+            bioReq.onsuccess = (be) => resBio({ userId: u.id, bioEntry: be.target.result || {} });
+            bioReq.onerror = () => resBio({ userId: u.id, bioEntry: {} });
+          }));
           cursor.continue();
         } else {
-          tx.oncomplete = () => resolve(users);
+          // Todas as leituras do IDB foram concluídas; realiza a descriptografia criptográfica assíncrona
+          Promise.all(bioPromises).then(async (bioResults) => {
+            const bioMap = {};
+            for (const r of bioResults) bioMap[r.userId] = r.bioEntry;
+
+            const finalUsers = [];
+            for (const u of rawUsers) {
+              const bioEntry = bioMap[u.id] || {};
+              if (bioEntry.encrypted_payload) {
+                try {
+                  const decryptedStr = await this.decryptData(bioEntry.encrypted_payload);
+                  if (decryptedStr) {
+                    const parsed = JSON.parse(decryptedStr);
+                    u.biometrics = {
+                      descriptors: parsed.descriptors || [],
+                      photoBlobs: parsed.photoBlobs || [],
+                      facePatches16x16: parsed.facePatches16x16 || [],
+                      videoBlob: parsed.videoBlob || null,
+                      sourceCount: bioEntry.sourceCount || 1,
+                      yolo16x16: !!parsed.yolo16x16 || !!bioEntry.yolo16x16,
+                      updatedAt: bioEntry.updatedAt
+                    };
+                  } else {
+                    u.biometrics = { descriptors: [], photoBlobs: [], facePatches16x16: [], sourceCount: bioEntry.sourceCount || 1 };
+                  }
+                } catch (err) {
+                  console.warn('[DB] Failed to decrypt biometric payload for user:', u.id, err);
+                  u.biometrics = { descriptors: [], photoBlobs: [], facePatches16x16: [], sourceCount: bioEntry.sourceCount || 1 };
+                }
+              } else {
+                // Backward compatibility for unencrypted records
+                u.biometrics = bioEntry;
+                if (u.biometrics && !u.biometrics.facePatches16x16) u.biometrics.facePatches16x16 = [];
+              }
+              finalUsers.push(u);
+            }
+            resolve(finalUsers);
+          }).catch(reject);
         }
       };
 
@@ -352,6 +369,147 @@ class SecureVisionDB {
 
       tx.onerror = (e) => reject(e.target.error);
     });
+  }
+
+  // Adiciona novas fotos e descritores a um usuário já cadastrado
+  async appendBiometricsToUser(userId, newDescriptors = [], newPhotoBlobs = [], newFacePatches16x16 = []) {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['users', 'biometrics'], 'readonly');
+      const userStore = tx.objectStore('users');
+      const bioStore = tx.objectStore('biometrics');
+
+      userStore.get(userId).onsuccess = async (ue) => {
+        const user = ue.target.result;
+        if (!user) {
+          return reject(new Error('Usuário não encontrado no banco de dados.'));
+        }
+
+        bioStore.get(userId).onsuccess = async (be) => {
+          const bioEntry = be.target.result || {};
+          let currentBio = { descriptors: [], photoBlobs: [], facePatches16x16: [], videoBlob: null };
+
+          if (bioEntry.encrypted_payload) {
+            try {
+              const decryptedStr = await this.decryptData(bioEntry.encrypted_payload);
+              if (decryptedStr) {
+                currentBio = JSON.parse(decryptedStr);
+              }
+            } catch (err) {
+              console.warn('[DB] Erro ao decifrar biometria existente ao anexar fotos:', err);
+            }
+          } else if (bioEntry.descriptors || bioEntry.photoBlobs) {
+            currentBio = {
+              descriptors: bioEntry.descriptors || [],
+              photoBlobs: bioEntry.photoBlobs || [],
+              facePatches16x16: bioEntry.facePatches16x16 || [],
+              videoBlob: bioEntry.videoBlob || null
+            };
+          }
+
+          currentBio.descriptors = (currentBio.descriptors || []).concat(newDescriptors);
+          currentBio.photoBlobs = (currentBio.photoBlobs || []).concat(newPhotoBlobs);
+          currentBio.facePatches16x16 = (currentBio.facePatches16x16 || []).concat(newFacePatches16x16);
+          currentBio.yolo16x16 = true;
+          const totalSources = (currentBio.photoBlobs.length) + (currentBio.videoBlob ? 1 : 0);
+
+          const updatedEncryptedPayload = await this.encryptData(JSON.stringify(currentBio));
+
+          const updatedBioRecord = {
+            userId: userId,
+            encrypted_payload: updatedEncryptedPayload,
+            sourceCount: totalSources,
+            yolo16x16: true,
+            updatedAt: new Date().toISOString()
+          };
+
+          const writeTx = this.db.transaction(['biometrics'], 'readwrite');
+          writeTx.objectStore('biometrics').put(updatedBioRecord);
+
+          writeTx.oncomplete = async () => {
+            console.log(`[DB] Adicionadas ${newPhotoBlobs.length} novas fotos para ${user.name}. Total: ${totalSources} fotos.`);
+            await this.addLog('SUCCESS', 'ATUALIZAÇÃO BIOMÉTRICA', `${newPhotoBlobs.length} nova(s) foto(s) biométrica(s) adicionada(s) ao perfil de ${user.name} (Total: ${totalSources} fontes).`);
+            if (this.supabaseConfig.enabled) {
+              this.syncToSupabase(user, currentBio);
+            }
+            resolve({ user, biometrics: currentBio, sourceCount: totalSources });
+          };
+
+          writeTx.onerror = (e) => reject(e.target.error);
+        };
+      };
+
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  /**
+   * Limpa todas as mensagens de log e auditoria (Sem alterar a tabela)
+   */
+  async clearAllLogs() {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['logs'], 'readwrite');
+      tx.objectStore('logs').clear();
+      tx.oncomplete = async () => {
+        console.log('[DB] Tabela logs limpa com sucesso.');
+        this.lastLogHash = null;
+        await this.addLog('INFO', 'HISTÓRICO LIMPO', 'Todas as mensagens de logs anteriores foram limpas pelo administrador.');
+        if (this.supabaseConfig.enabled) {
+          try {
+            await fetch(`${this.supabaseConfig.url}/rest/v1/logs?id=gt.0`, {
+              method: 'DELETE',
+              headers: this.getSupabaseHeaders()
+            });
+          } catch (e) {
+            console.warn('[Supabase] Erro ao limpar logs em nuvem:', e);
+          }
+        }
+        resolve(true);
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  /**
+   * Limpa todos os dados de usuários e biometrias cadastradas (Sem alterar a estrutura da tabela)
+   */
+  async clearAllUserData() {
+    if (!this.db) await this.init();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['users', 'biometrics'], 'readwrite');
+      tx.objectStore('users').clear();
+      tx.objectStore('biometrics').clear();
+      tx.oncomplete = async () => {
+        console.log('[DB] Tabelas users e biometrics limpas com sucesso (estruturas preservadas).');
+        await this.addLog('DANGER', 'BANCO DE DADOS LIMPO', 'Todos os cadastros e dados biométricos foram limpos (tabelas preservadas).');
+        if (this.supabaseConfig.enabled) {
+          try {
+            await fetch(`${this.supabaseConfig.url}/rest/v1/biometrics?user_id=neq.dummy`, {
+              method: 'DELETE',
+              headers: this.getSupabaseHeaders()
+            });
+            await fetch(`${this.supabaseConfig.url}/rest/v1/users?id=neq.dummy`, {
+              method: 'DELETE',
+              headers: this.getSupabaseHeaders()
+            });
+          } catch (e) {
+            console.warn('[Supabase] Erro ao limpar usuários em nuvem:', e);
+          }
+        }
+        resolve(true);
+      };
+      tx.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  /**
+   * Reset completo de dados (Limpar logs + usuários sem alterar as tabelas)
+   */
+  async resetAllData() {
+    await this.clearAllUserData();
+    await this.clearAllLogs();
+    return true;
   }
 
   // Immutable Log Auditing System with SHA-256 Cryptographic Hash Chaining

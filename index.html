@@ -59,12 +59,53 @@
       // 3. Anti-Debugger Trap & Detecção de Abertura de DevTools (Acoplado e Desacoplado)
       var isDevToolsOpen = false;
 
-      // Verificação segura sem travamento indevido da interface
+      // Método A: Verificação de dimensão de janela (Docked DevTools)
       function checkDockedDevTools() {
-        return false; // Desativa falso positivo de redimensionamento
+        var threshold = 160;
+        return (window.outerWidth - window.innerWidth > threshold) || 
+               (window.outerHeight - window.innerHeight > threshold);
       }
 
-      var devtoolsDetectorTimer = null;
+      // Método B: Console Getter Detector (Undocked DevTools)
+      var elementTrap = new Image();
+      Object.defineProperty(elementTrap, 'id', {
+        get: function() {
+          isDevToolsOpen = true;
+        }
+      });
+
+      var devtoolsDetectorTimer = setInterval(function() {
+        isDevToolsOpen = checkDockedDevTools();
+
+        // Dispara trigger de console para pegar janela desacoplada
+        try {
+          console.log('%c', elementTrap);
+          console.clear();
+        } catch (e) {}
+
+        var warningEl = document.getElementById('devtoolsLockdownOverlay');
+        if (isDevToolsOpen) {
+          if (!warningEl) {
+            warningEl = document.createElement('div');
+            warningEl.id = 'devtoolsLockdownOverlay';
+            warningEl.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(11,15,25,0.98); z-index:999999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#fff; text-align:center; padding:20px; font-family:Inter, sans-serif;';
+            warningEl.innerHTML = `
+              <div style="font-size:3.5rem; margin-bottom:12px;">🚫</div>
+              <h1 style="color:#ef4444; font-size:1.8rem; margin-bottom:8px; font-weight:800;">ACESSO NEGADO - MODO KIOSK ATIVO</h1>
+              <p style="color:#94a3b8; font-size:0.95rem; max-width:550px; line-height:1.5;">
+                O painel de desenvolvedor (DevTools/F12) foi detectado aberto. Por diretrizes de segurança e conformidade da central de vigilância, feche o painel de inspeção para desbloquear a interface.
+              </p>
+            `;
+            document.body.appendChild(warningEl);
+          }
+          // Congela a depuração
+          try { Function('debugger')(); } catch (err) {}
+        } else {
+          if (warningEl && warningEl.parentNode) {
+            warningEl.parentNode.removeChild(warningEl);
+          }
+        }
+      }, 400);
     })();
   </script>
 
@@ -144,22 +185,6 @@
           <div class="metric-item">
             <span class="metric-label">ACTIVE STREAMS</span>
             <span class="metric-value" id="activeStreamsCount" style="color: var(--text-main);">1 / 4</span>
-          </div>
-        </div>
-
-        <!-- SELETOR DE MODOS DE MONITOR (1: PADRÃO | 2: PRIORIZAR CADASTRO | 3: APENAS CÂMERAS) -->
-        <div class="display-mode-container">
-          <span class="display-mode-label">🖥️ MONITOR:</span>
-          <div class="display-mode-toggle" id="displayModeToggle">
-            <button type="button" class="btn-mode-toggle active" data-mode="default" id="btnModeDefault" title="Modo 1: Painel Completo Padrão">
-              1. Padrão
-            </button>
-            <button type="button" class="btn-mode-toggle" data-mode="enrollment" id="btnModeEnrollment" title="Modo 2: Foco Prioritário no Cadastro de Rostos">
-              2. Cadastro
-            </button>
-            <button type="button" class="btn-mode-toggle" data-mode="cameras" id="btnModeCameras" title="Modo 3: Mural de Câmeras 24H (Vigilância Completa)">
-              3. Câmeras
-            </button>
           </div>
         </div>
 
@@ -364,6 +389,14 @@
                   <video class="cam-video" id="videoFeedCam1" autoplay muted playsinline></video>
                   <canvas class="cam-canvas" id="canvasFeedCam1"></canvas>
                   
+                  <!-- HUD: Rosto Isolado pelo YOLO em Fundo Preto & Centralizado (Matriz 16x16) -->
+                  <div class="isolated-face-pip" id="isolatedFacePip" style="display:none; position:absolute; bottom:12px; right:12px; width:88px; height:88px; background:#000000; border:2px solid var(--accent-cyan, #06b6d4); border-radius:8px; overflow:hidden; box-shadow:0 4px 14px rgba(0,0,0,0.85); z-index:12;">
+                    <canvas id="isolatedFaceCanvas" width="16" height="16" style="width:100%; height:100%; display:block; background:#000000; image-rendering:pixelated; image-rendering:-moz-crisp-edges; image-rendering:crisp-edges;"></canvas>
+                    <div style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.85); color:#06b6d4; font-size:7px; font-family:monospace; text-align:center; padding:2px 0; border-top:1px solid rgba(6,182,212,0.3); letter-spacing:0.5px; font-weight:700;">
+                      YOLO 16×16 · ArcFace
+                    </div>
+                  </div>
+                  
                   <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
                   <div class="no-camera-overlay" id="noCamOverlay1" style="display:none;">
                     <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
@@ -374,50 +407,10 @@
                 </div>
               </div>
 
-              <!-- Feed 2: Sector North Turnstiles -->
-              <div class="camera-card" id="cardCam2">
-                <div class="camera-header">
-                  <span class="cam-tag" id="tagCam2">CAM_02 · Catracas / Entrada Norte</span>
-                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam2">DISCONNECTED</span>
-                </div>
-                <div class="cam-feed-container" id="containerCam2">
-                  <video class="cam-video" id="videoFeedCam2" autoplay muted playsinline style="display:none;"></video>
-                  <canvas class="cam-canvas" id="canvasFeedCam2" style="display:none;"></canvas>
-                  
-                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
-                  <div class="no-camera-overlay" id="noCamOverlay2">
-                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Conecte uma webcam física USB ou câmera IP neste slot.</div>
-                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Feed 3: Sector Vault / Thermal -->
-              <div class="camera-card" id="cardCam3">
-                <div class="camera-header">
-                  <span class="cam-tag" id="tagCam3">CAM_03 · Acesso ao Cofre</span>
-                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam3">DISCONNECTED</span>
-                </div>
-                <div class="cam-feed-container" id="containerCam3">
-                  <video class="cam-video" id="videoFeedCam3" autoplay muted playsinline style="display:none;"></video>
-                  <canvas class="cam-canvas" id="canvasFeedCam3" style="display:none;"></canvas>
-
-                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
-                  <div class="no-camera-overlay" id="noCamOverlay3">
-                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Conecte uma webcam física USB ou câmera IP neste slot.</div>
-                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Feed 4: Server Room -->
+              <!-- Feed 2: Server Rm B -->
               <div class="camera-card" id="cardCam4">
                 <div class="camera-header">
-                  <span class="cam-tag" id="tagCam4">CAM_04 · Sala de Servidores</span>
+                  <span class="cam-tag" id="tagCam4">CAM_04 · Server Rm B</span>
                   <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam4">DISCONNECTED</span>
                 </div>
                 <div class="cam-feed-container" id="containerCam4">
@@ -428,12 +421,171 @@
                   <div class="no-camera-overlay" id="noCamOverlay4">
                     <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
                     <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Conecte uma webcam física USB ou câmera IP neste slot.</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Conecte uma webcam física ou câmera de segurança IP/RTSP.</div>
                     <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
                   </div>
                 </div>
               </div>
 
+              <!-- Feed 3: Vault Stream -->
+              <div class="camera-card" id="cardCam3">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam3">CAM_03 · Infra Vault Thermal</span>
+                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam3">DISCONNECTED</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam3">
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay3">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Sem transmissão ativa para este setor.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feed 4: North Turnstiles -->
+              <div class="camera-card" id="cardCam2">
+                <div class="camera-header">
+                  <span class="cam-tag" id="tagCam2">CAM_02 · North Turnstiles</span>
+                  <span style="color:var(--text-dim); font-size:0.7rem; font-weight:700;" id="statusCam2">DISCONNECTED</span>
+                </div>
+                <div class="cam-feed-container" id="containerCam2">
+                  <canvas class="cam-canvas" id="canvasFeedCam2" style="display:none;"></canvas>
+                  
+                  <!-- OVERLAY QUANDO NENHUMA CÂMERA ESTIVER CONECTADA -->
+                  <div class="no-camera-overlay" id="noCamOverlay2">
+                    <svg class="no-cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    <div style="font-weight:700; color:var(--text-main); font-size:0.95rem;">NENHUMA CÂMERA CONECTADA</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px; max-width:240px;">Aguardando sinal de vídeo do dispositivo de entrada.</div>
+                    <button class="btn-action" style="margin-top:12px; font-size:0.75rem; padding:6px 14px;" onclick="window.svApp.openCameraCheckModal()">🔍 Conectar Câmera</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Pipeline Orange Data Mining Workflow Card (Isolamento 16x16 YOLO + Embeddings ArcFace) -->
+            <div class="orange-workflow-card">
+              <div class="orange-workflow-header">
+                <div class="orange-title-group">
+                  <span class="orange-brand-icon">🍊</span>
+                  <div>
+                    <div class="orange-title">Arquitetura de Reconhecimento Facial — Pipeline Orange Data Mining</div>
+                    <div class="orange-sub">
+                      Isolamento estrito do rosto em matriz 16×16 sobre fundo preto via YOLO + Extração de Embeddings 128-D ArcFace + Classificação
+                    </div>
+                  </div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <span class="orange-badge">YOLO 16×16</span>
+                  <span class="orange-badge">ArcFace 128-D</span>
+                  <span class="orange-badge">kNN / Neural Net</span>
+                </div>
+              </div>
+
+              <div class="orange-canvas">
+                <!-- Linha 1: Banco de Dados Cadastrado -->
+                <div class="orange-lane">
+                  <div class="orange-node" id="nodeDbImport">
+                    <div class="orange-node-icon">📁</div>
+                    <div class="orange-node-label">Import Images</div>
+                    <div class="orange-node-sub">Banco de Fotos</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node" id="nodeDbViewer">
+                    <div class="orange-node-icon">🖼️</div>
+                    <div class="orange-node-label">Image Viewer</div>
+                    <div class="orange-node-sub">YOLO 16×16 Isolado</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node" id="nodeDbEmbedding">
+                    <div class="orange-node-icon">🧠</div>
+                    <div class="orange-node-label">Image Embedding</div>
+                    <div class="orange-node-sub">ArcFace (128-D)</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node" id="nodeDbDataTable">
+                    <div class="orange-node-icon">📊</div>
+                    <div class="orange-node-label">Data Table</div>
+                    <div class="orange-node-sub">Base de Vetores</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node" id="nodeClassifier">
+                    <div class="orange-node-icon">🎯</div>
+                    <div class="orange-node-label">kNN / Neural Net</div>
+                    <div class="orange-node-sub">Classificador Facial</div>
+                  </div>
+                </div>
+
+                <!-- Linha 2: Câmera ao Vivo em Tempo Real -->
+                <div class="orange-lane">
+                  <div class="orange-node active-live" id="nodeLiveImport">
+                    <div class="orange-node-icon">📹</div>
+                    <div class="orange-node-label">Import Images (1)</div>
+                    <div class="orange-node-sub">Câmera ao Vivo</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node active-live" id="nodeLiveViewer">
+                    <div class="orange-node-icon">
+                      <canvas id="orangeLiveFace16Canvas" width="16" height="16" style="width:26px; height:26px; image-rendering:pixelated; border-radius:3px; background:#000; border:1px solid #06b6d4;"></canvas>
+                    </div>
+                    <div class="orange-node-label">Image Viewer (1)</div>
+                    <div class="orange-node-sub">YOLO 16×16 em Fundo Preto</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node active-live" id="nodeLiveEmbedding">
+                    <div class="orange-node-icon">⚡</div>
+                    <div class="orange-node-label">Image Embedding (1)</div>
+                    <div class="orange-node-sub">ArcFace (128-D)</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node active-live" id="nodeLiveDataTable">
+                    <div class="orange-node-icon">📈</div>
+                    <div class="orange-node-label">Data Table (1)</div>
+                    <div class="orange-node-sub">Vetor ao Vivo</div>
+                  </div>
+                  <div class="orange-connector"></div>
+                  <div class="orange-node" id="nodePredictions">
+                    <div class="orange-node-icon">⚖️</div>
+                    <div class="orange-node-label">Predictions</div>
+                    <div class="orange-node-sub" id="orangePredictionSub">Aguardando presença...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Painel de Comparação Visual 16x16: Rosto Câmera vs Rosto Banco -->
+              <div class="orange-comparison-panel">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">
+                  Comparação de Matrizes 16×16 & Cosseno ArcFace:
+                </div>
+                
+                <div class="comp-face-box">
+                  <canvas id="compLive16" width="16" height="16" style="width:40px; height:40px; image-rendering:pixelated; background:#000; border:1px solid #06b6d4; border-radius:4px;"></canvas>
+                  <div class="comp-face-label">Rosto Câmera (16×16)</div>
+                </div>
+
+                <div style="font-size:1.1rem; color:var(--text-dim);">⟷</div>
+
+                <div class="comp-face-box">
+                  <canvas id="compDb16" width="16" height="16" style="width:40px; height:40px; image-rendering:pixelated; background:#000; border:1px solid rgba(255,255,255,0.2); border-radius:4px;"></canvas>
+                  <div class="comp-face-label">Rosto Banco (16×16)</div>
+                </div>
+
+                <div class="comp-metric-tag">
+                  <span>Similaridade Cosseno:</span>
+                  <span id="compCosineVal" style="color:var(--accent-cyan); font-weight:700;">—</span>
+                </div>
+
+                <div class="comp-metric-tag">
+                  <span>Compatibilidade:</span>
+                  <span id="compConfVal" style="color:var(--text-main); font-weight:700;">—</span>
+                </div>
+
+                <div id="compStatusTag" style="font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(100,116,139,0.15); color:#94a3b8; border:1px solid #64748b;">
+                  ⏸️ STANDBY
+                </div>
+              </div>
             </div>
 
             <!-- Bottom System Integrity Monitor Bar -->
@@ -483,78 +635,36 @@
                     </div>
 
                     <div class="form-group">
-                      <label>CPF (Criptografado AES-256) <span style="color:var(--text-muted); font-size:0.75rem;">(Opcional para testes)</span></label>
-                      <input type="text" class="form-control" id="enrollCpf" placeholder="000.000.000-00 (Opcional)" maxlength="14" autocomplete="off">
-                      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Opcional: Se deixado em branco, o sistema gerará um identificador criptográfico automático.</div>
+                      <label>CPF (Criptografado com Passphrase AES-256) *</label>
+                      <input type="text" class="form-control" id="enrollCpf" required placeholder="000.000.000-00" maxlength="14" autocomplete="off">
+                      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Restrição: Apenas números (limite de 11 dígitos, formatação 000.000.000-00).</div>
                     </div>
                   </div>
 
                   <div>
-                    <label style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Fontes Biométricas da Face (Múltiplas Fotos)</label>
-                    <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-top:6px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+                    <label style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Fontes Biométricas da Face (Upload de Arquivos, Webcam ou Drag & Drop)</label>
+                    <div id="mediaSourcesDropZone" class="media-dropzone" style="background:var(--bg-dark); padding:14px; margin-top:6px; display:flex; flex-direction:column; align-items:center; gap:10px;">
                       <video id="enrollmentWebcamPreview" style="width:200px; height:130px; background:#000; border-radius:6px; object-fit:cover;" autoplay muted playsinline></video>
                       
-                      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
-                        <button type="button" class="btn-action" id="btnCapturePhoto" style="font-size:0.75rem;">📷 Capturar Foto</button>
-                        <button type="button" class="btn-outline" id="btnClearPhotos" style="font-size:0.75rem; color:#ef4444; border-color:rgba(239,68,68,0.4);">🗑️ Limpar Fotos</button>
+                      <!-- Input de arquivo invisível para envio direto de fotos (JPG, PNG, WEBP) -->
+                      <input type="file" id="photoFileInput" multiple accept="image/jpeg,image/png,image/webp" style="display:none;">
+
+                      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; width:100%;">
+                        <button type="button" class="btn-action" id="btnCapturePhoto" style="font-size:0.75rem;">📷 Foto Webcam</button>
+                        <button type="button" class="btn-action" id="btnUploadPhotos" style="font-size:0.75rem; background:linear-gradient(135deg, #0ea5e9, #0284c7); border-color:#0284c7;">📁 Enviar Fotos (JPG/PNG)</button>
+                        <button type="button" class="btn-outline" id="btnBurstCapture" style="font-size:0.75rem;">⚡ 3 Ângulos Rápido</button>
+                        <button type="button" class="btn-outline" id="btnRecordVideo" style="font-size:0.75rem;">🎥 Gravar Vídeo (3s)</button>
                       </div>
 
-                      <div id="sourcesCapturedCount" style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan);">0 / 20 Fotos Biométricas Capturadas</div>
-                      <div class="media-source-preview" id="mediaSourcesContainer"></div>
-                    </div>
-                  </div>
-                </div>
+                      <div style="font-size:0.72rem; color:var(--text-muted); text-align:center;">
+                        💡 Dica: Você também pode <strong>arrastar e soltar fotos</strong> do seu computador direto nesta caixa!
+                      </div>
 
-                <!-- GUIA DE PRECISÃO BIOMÉTRICA (REGRA DE OURO ARCFACE) -->
-                <div class="golden-rule-card" style="margin-top:20px; background:rgba(15,23,42,0.6); border:1px solid rgba(6,182,212,0.3); border-radius:8px; padding:16px;">
-                  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                      <span style="font-size:1.1rem;">💡</span>
-                      <strong style="color:var(--accent-cyan); font-size:0.9rem;">Guia de Amostragem ArcFace: "Regra de Ouro" para Máxima Precisão</strong>
+                      <div id="photoValidationStatus" style="display:none; font-size:0.75rem; padding:4px 10px; border-radius:4px; text-align:center; width:90%;"></div>
+
+                      <div id="sourcesCapturedCount" style="font-family:var(--font-mono); font-size:0.75rem; color:var(--accent-cyan);">0 Fotos Biométricas Adicionadas</div>
+                      <div class="media-source-preview" id="mediaSourcesContainer" title="Arraste para os lados ou use a roda do mouse para visualizar todas as fotos"></div>
                     </div>
-                    <span style="font-size:0.75rem; background:rgba(6,182,212,0.15); color:var(--accent-cyan); padding:3px 10px; border-radius:4px; font-weight:600; border:1px solid rgba(6,182,212,0.3);">Recomendado: 6 a 12 Fotos</span>
-                  </div>
-                  <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:12px; line-height:1.4;">
-                    O motor <strong>ArcFace</strong> calcula um <em>Centroide Vetorial (128-D)</em> ponderado. Cadastrar variações sutis de ângulo garante reconhecimento instantâneo ao vivo e elimina falsas rejeições:
-                  </p>
-                  
-                  <div style="overflow-x:auto;">
-                    <table class="golden-rule-table" style="width:100%; border-collapse:collapse; font-size:0.78rem; text-align:left;">
-                      <thead>
-                        <tr style="background:rgba(30,41,59,0.8); border-bottom:1px solid var(--border-color); color:var(--text-main);">
-                          <th style="padding:8px 10px; width:95px; text-align:center;">Quantidade</th>
-                          <th style="padding:8px 10px;">Como Posicionar o Rosto</th>
-                          <th style="padding:8px 10px;">Benefício para a IA</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                          <td style="padding:8px 10px; text-align:center; font-weight:700; color:var(--accent-cyan);">3 fotos</td>
-                          <td style="padding:8px 10px;">Olhando direto para a câmera (expressão neutra e leve sorriso)</td>
-                          <td style="padding:8px 10px; color:var(--text-muted);">Base frontal principal e proporção áurea facial estável</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                          <td style="padding:8px 10px; text-align:center; font-weight:700; color:var(--accent-cyan);">2 fotos</td>
-                          <td style="padding:8px 10px;">Girando o rosto levemente para a <strong>esquerda (~15°)</strong></td>
-                          <td style="padding:8px 10px; color:var(--text-muted);">Reconhece a pessoa mesmo quando ela se aproxima de lado</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                          <td style="padding:8px 10px; text-align:center; font-weight:700; color:var(--accent-cyan);">2 fotos</td>
-                          <td style="padding:8px 10px;">Girando o rosto levemente para a <strong>direita (~15°)</strong></td>
-                          <td style="padding:8px 10px; color:var(--text-muted);">Compensa o ângulo oposto sem perder traços oculares</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                          <td style="padding:8px 10px; text-align:center; font-weight:700; color:var(--accent-cyan);">2 fotos</td>
-                          <td style="padding:8px 10px;">Inclinando levemente a cabeça para <strong>cima e para baixo</strong></td>
-                          <td style="padding:8px 10px; color:var(--text-muted);">Compensa variações de altura da câmera ou postura</td>
-                        </tr>
-                        <tr>
-                          <td style="padding:8px 10px; text-align:center; font-weight:700; color:var(--accent-cyan);">1 a 2 fotos</td>
-                          <td style="padding:8px 10px;">Com e sem óculos (caso o usuário utilize óculos no dia a dia)</td>
-                          <td style="padding:8px 10px; color:var(--text-muted);">Evita falsa rejeição causada por reflexos de luz na armação/lente</td>
-                        </tr>
-                      </tbody>
-                    </table>
                   </div>
                 </div>
 
@@ -566,7 +676,7 @@
                     Ao marcar a caixa abaixo, o titular concorda expressamente que o sistema <strong>SecureVision AI</strong> realize a coleta, extração de vetores faciais e armazenamento de suas imagens e vídeos biométricos exclusivamente para a finalidade de <em>Controle de Acesso e Segurança de Informação 24H</em>. O titular declara estar ciente de que pode solicitar a EXCLUSÃO DEFINITIVA (expurgo total) de suas mídias a qualquer momento através do painel de administração.
                   </div>
                   <label style="display:flex; align-items:center; gap:10px; font-size:0.85rem; color:var(--text-main); cursor:pointer;">
-                    <input type="checkbox" id="lgpdConsentCheckbox" checked style="width:18px; height:18px; accent-color:var(--accent-blue);">
+                    <input type="checkbox" id="lgpdConsentCheckbox" required style="width:18px; height:18px; accent-color:var(--accent-blue);">
                     Declaro que li e aceito os termos do consentimento LGPD para salvamento de biometria e criptografia de dados.
                   </label>
                 </div>
@@ -585,6 +695,8 @@
 
               <h3 style="font-size:1.0rem; font-weight:700; margin-bottom:12px;">Pessoas Cadastradas & Gestão de Direitos do Titular (LGPD)</h3>
               <div id="registeredUsersList"></div>
+              <!-- Input oculto para anexar fotos a usuário já cadastrado -->
+              <input type="file" id="appendUserPhotosFileInput" multiple accept="image/jpeg,image/png,image/webp" style="display:none;">
             </div>
           </div>
 
@@ -644,14 +756,42 @@
                     <option value="disabled">Desativada (Execução Contínua)</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- Card 2.5: Limiar Mínimo para Pessoa Não Cadastrada (Taxa de Reconhecimento) -->
+              <div class="settings-card" style="border:1px solid rgba(6,182,212,0.4);">
+                <div class="settings-card-title" style="color:var(--accent-cyan);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                  Taxa Mínima para Pessoa Não Cadastrada (Limiar Biométrico)
+                </div>
+
+                <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:12px;">
+                  Define a porcentagem mínima de compatibilidade necessária para autorizar uma pessoa. Se o escore for inferior a este valor, a pessoa é categorizada como <strong>Pessoa Não Cadastrada</strong>.
+                </p>
 
                 <div class="form-group">
-                  <label>Modo de Calibração / Demonstração FECART</label>
-                  <select class="form-control" id="selectTestMode">
-                    <option value="auto">Detecção Real por IA (Câmera Ativa)</option>
-                    <option value="simulate_authorized">Simulação: Forçar Autorizado</option>
-                    <option value="simulate_unauthorized">Simulação: Forçar Alerta Não Autorizado</option>
-                  </select>
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;">
+                    <label style="margin:0; font-weight:600;">Limiar de Compatibilidade Mínima:</label>
+                    <span id="valThresholdPct" style="font-family:var(--font-mono); font-size:1.05rem; font-weight:800; color:var(--accent-cyan); background:rgba(6,182,212,0.12); padding:2px 10px; border-radius:6px; border:1px solid rgba(6,182,212,0.3);">90.0%</span>
+                  </div>
+                  <input type="range" min="50" max="98" value="90" step="1" class="form-control" id="minRecognitionThresholdRange" style="accent-color:var(--accent-cyan); cursor:pointer;">
+                  <div style="font-size:0.72rem; color:var(--text-muted); display:flex; justify-content:space-between; margin-top:4px;">
+                    <span>50% (Permissivo)</span>
+                    <span style="color:var(--accent-cyan); font-weight:700;">90% (Padrão Seguro)</span>
+                    <span>98% (Alta Rigidez)</span>
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+                  <button type="button" class="btn-outline" id="btnPresetTolerant" style="font-size:0.75rem; padding:6px 10px; flex:1; justify-content:center;">
+                    ⚡ Tolerante (80%)
+                  </button>
+                  <button type="button" class="btn-outline" id="btnPresetStandard" style="font-size:0.75rem; padding:6px 10px; flex:1; justify-content:center; border-color:var(--accent-cyan); color:var(--accent-cyan);">
+                    🛡️ Padrão (90%)
+                  </button>
+                  <button type="button" class="btn-outline" id="btnPresetStrict" style="font-size:0.75rem; padding:6px 10px; flex:1; justify-content:center;">
+                    🔒 Rigoroso (95%)
+                  </button>
                 </div>
               </div>
 
