@@ -185,11 +185,11 @@ class BiometricsEngine {
     // Detector de Liveness Blindado
     this.livenessDetector = new AntiSpoofingLivenessDetector();
     
-    // Limiares de Decisão com Histerese (Schmitt Trigger ArcFace com Vetores Diferenciais de Média Zero)
-    // Para ADQUIRIR autorização de novo rosto: limiar de 0.58 (estranhos ficam entre -0.20 e +0.35)
-    // Para RETER autorização contínua de rosto já confirmado: limiar de 0.46
-    this.SIMILARITY_THRESHOLD = 0.58;
-    this.HOLD_THRESHOLD = 0.46;
+    // Limiares de Decisão diretamente vinculados ao slider "Porcentagem Mínima para Pessoa Não Cadastrada"
+    const savedMinPercent = parseFloat(localStorage.getItem('sv_min_unauth_percentage') || '60');
+    this.minUnauthPercentage = savedMinPercent;
+    this.SIMILARITY_THRESHOLD = savedMinPercent / 100;
+    this.HOLD_THRESHOLD = Math.max(0.20, (savedMinPercent / 100) * 0.80);
     this.MIN_FACE_SIZE = 90; // Proximidade mínima da face em pixels no canvas
     
     this.confirmedIdentity = null;
@@ -197,7 +197,6 @@ class BiometricsEngine {
     this.MAX_IDENTITY_HOLD = 14; // ~1 segundo de buffer de retenção contra quedas por iluminação/óculos
     this.smoothedConfidence = 0;
     this.lastFacePixels = 0;
-    this.minUnauthPercentage = parseFloat(localStorage.getItem('sv_min_unauth_percentage') || '60');
 
     this.smoothedBox = null;
     this.lastMatchResult = { matched: false, label: 'Buscando no banco...', confidence: 0 };
@@ -208,6 +207,18 @@ class BiometricsEngine {
     this.isolatedFaceCanvas = document.createElement('canvas');
     this.isolatedFaceCanvas.width = 160;
     this.isolatedFaceCanvas.height = 160;
+  }
+
+  // Atualiza os limiares matemáticos em tempo real assim que o usuário desliza a barra
+  setMinUnauthPercentage(val) {
+    const parsed = Math.max(10, Math.min(95, parseFloat(val) || 60));
+    this.minUnauthPercentage = parsed;
+    this.SIMILARITY_THRESHOLD = parsed / 100;
+    this.HOLD_THRESHOLD = Math.max(0.20, (parsed / 100) * 0.80);
+    this.confirmedIdentity = null;
+    this.identityHoldFrames = 0;
+    this.smoothedConfidence = 0;
+    console.log(`[Biometrics] Limiar Matemático em Tempo Real -> SIMILARITY_THRESHOLD: ${this.SIMILARITY_THRESHOLD.toFixed(2)} (${parsed}%), HOLD_THRESHOLD: ${this.HOLD_THRESHOLD.toFixed(2)}`);
   }
 
   async init() {
@@ -711,7 +722,7 @@ class BiometricsEngine {
       this.confirmedIdentity = bestProfile;
       this.identityHoldFrames = this.MAX_IDENTITY_HOLD;
 
-      const rawConfidence = Math.min(99.8, Math.max(65.0, (maxCosine * 100)));
+      const rawConfidence = Math.min(99.8, Math.max(10.0, (maxCosine * 100)));
       if (this.smoothedConfidence === 0) {
         this.smoothedConfidence = rawConfidence;
       } else {
@@ -727,6 +738,7 @@ class BiometricsEngine {
         accessLevel: bestProfile.accessLevel,
         isBlocked: !!bestProfile.isBlocked,
         confidence: this.smoothedConfidence.toFixed(1),
+        minRequiredPercentage: (this.minUnauthPercentage || 60),
         arcFaceMarginLogit: bestArcMargin ? bestArcMargin.scaledMarginLogit.toFixed(2) : '0.00',
         cosineSimilarity: maxCosine.toFixed(3),
         liveness: livenessResult,
@@ -735,8 +747,8 @@ class BiometricsEngine {
     }
 
     // AMORTECIMENTO DE MICRO-QUEDAS (Ex: piscadas de olhos, reflexos em lentes de óculos ou fones):
-    // Se a pessoa já foi confirmada e a similaridade ainda é razoável (>= 0.38), retém a identidade por alguns frames:
-    if (this.confirmedIdentity && this.identityHoldFrames > 0 && maxCosine >= 0.38) {
+    // Se a pessoa já foi confirmada e a similaridade ainda é razoável (>= HOLD_THRESHOLD), retém a identidade por alguns frames:
+    if (this.confirmedIdentity && this.identityHoldFrames > 0 && maxCosine >= this.HOLD_THRESHOLD) {
       this.identityHoldFrames--;
       return {
         matched: true,
@@ -746,6 +758,7 @@ class BiometricsEngine {
         accessLevel: this.confirmedIdentity.accessLevel,
         isBlocked: !!this.confirmedIdentity.isBlocked,
         confidence: this.smoothedConfidence.toFixed(1),
+        minRequiredPercentage: (this.minUnauthPercentage || 60),
         arcFaceMarginLogit: bestArcMargin ? bestArcMargin.scaledMarginLogit.toFixed(2) : '0.00',
         cosineSimilarity: maxCosine.toFixed(3),
         liveness: livenessResult,
@@ -757,26 +770,21 @@ class BiometricsEngine {
     this.confirmedIdentity = null;
     this.smoothedConfidence = 0;
 
-    // Cálculo da Certeza Biométrica da Face Atual:
-    const facePixelsCount = this.lastFacePixels || 55;
-    const livenessScore = (livenessResult && typeof livenessResult.score === 'number') ? livenessResult.score : 0.85;
-    const faceCertainty = Math.min(99, Math.max(25, Math.floor((facePixelsCount / 85) * 100 * livenessScore)));
-    
     const minPercent = this.minUnauthPercentage || 60;
-    const showUnauth = faceCertainty >= minPercent;
+    const currentSimilarityPercent = Math.max(0, (maxCosine * 100)).toFixed(1);
 
-    // DESCONHECIDO (RED ALERT) - Só aciona o alerta quando atinge a porcentagem mínima configurada
+    // DESCONHECIDO (RED ALERT) - Aciona quando o rosto não atinge o percentual mínimo configurado
     return {
       matched: false,
-      label: showUnauth ? 'PESSOA NÃO CADASTRADA (DESCONHECIDO)' : `ANALISANDO ROSTO... (${faceCertainty}%)`,
-      reason: `Similaridade (${maxCosine.toFixed(3)}) abaixo do limiar estrito ${this.SIMILARITY_THRESHOLD}`,
-      confidence: faceCertainty.toString(),
-      rawConfidence: faceCertainty,
+      label: 'PESSOA NÃO CADASTRADA',
+      reason: `Similaridade (${currentSimilarityPercent}%) abaixo da porcentagem mínima configurada (${minPercent}%)`,
+      confidence: currentSimilarityPercent,
+      minRequiredPercentage: minPercent,
       cosineSimilarity: maxCosine.toFixed(3),
       arcFaceMarginLogit: bestArcMargin ? bestArcMargin.scaledMarginLogit.toFixed(2) : '0.00',
       liveness: livenessResult,
       profilesChecked: totalComparisons,
-      showUnauthAlert: showUnauth
+      showUnauthAlert: true
     };
   }
 

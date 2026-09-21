@@ -121,42 +121,36 @@ class SecureVisionApp {
       });
     }
 
-    // Configuração de Porcentagem Mínima para Alerta de Pessoa Não Cadastrada
+    // Configuração de Porcentagem Mínima para Alerta de Pessoa Não Cadastrada & Tolerância
     const minUnauthRange = document.getElementById('minUnauthPercentageRange');
     const minUnauthVal = document.getElementById('minUnauthPercentageVal');
-    if (minUnauthRange) {
-      const savedMin = localStorage.getItem('sv_min_unauth_percentage') || '60';
-      minUnauthRange.value = savedMin;
-      if (minUnauthVal) minUnauthVal.textContent = `${savedMin}%`;
-      if (window.svBiometrics) window.svBiometrics.minUnauthPercentage = parseFloat(savedMin);
-
-      minUnauthRange.addEventListener('input', (e) => {
-        const val = e.target.value;
-        if (minUnauthVal) minUnauthVal.textContent = `${val}%`;
-        localStorage.setItem('sv_min_unauth_percentage', val);
-        if (window.svBiometrics) window.svBiometrics.minUnauthPercentage = parseFloat(val);
-      });
-    }
-
-    // Slider de Sensibilidade Geral (Tolerância ArcFace)
     const sensRange = document.getElementById('sensitivityRange');
     const sensVal = document.getElementById('sensitivityRangeVal');
-    if (sensRange) {
-      const savedSens = localStorage.getItem('sv_sensitivity_range') || '75';
-      sensRange.value = savedSens;
-      if (sensVal) sensVal.textContent = `${savedSens}%`;
-      if (window.svBiometrics) {
-        window.svBiometrics.SIMILARITY_THRESHOLD = (parseFloat(savedSens) / 100) * 0.77;
-      }
 
-      sensRange.addEventListener('input', (e) => {
-        const val = e.target.value;
-        if (sensVal) sensVal.textContent = `${val}%`;
-        localStorage.setItem('sv_sensitivity_range', val);
-        if (window.svBiometrics) {
-          window.svBiometrics.SIMILARITY_THRESHOLD = (parseFloat(val) / 100) * 0.77;
-        }
-      });
+    const updateAllThresholds = (val) => {
+      const numVal = Math.max(10, Math.min(95, parseFloat(val) || 60));
+      localStorage.setItem('sv_min_unauth_percentage', numVal);
+      localStorage.setItem('sv_sensitivity_range', numVal);
+      if (minUnauthRange) minUnauthRange.value = numVal;
+      if (minUnauthVal) minUnauthVal.textContent = `${numVal}%`;
+      if (sensRange) sensRange.value = numVal;
+      if (sensVal) sensVal.textContent = `${numVal}%`;
+      if (window.svBiometrics) {
+        window.svBiometrics.setMinUnauthPercentage(numVal);
+      }
+    };
+
+    if (minUnauthRange) {
+      const savedMin = localStorage.getItem('sv_min_unauth_percentage') || '60';
+      updateAllThresholds(savedMin);
+
+      minUnauthRange.addEventListener('input', (e) => updateAllThresholds(e.target.value));
+      minUnauthRange.addEventListener('change', (e) => updateAllThresholds(e.target.value));
+    }
+
+    if (sensRange) {
+      sensRange.addEventListener('input', (e) => updateAllThresholds(e.target.value));
+      sensRange.addEventListener('change', (e) => updateAllThresholds(e.target.value));
     }
 
     // Theme Switcher (Escuro vs Claro)
@@ -760,7 +754,9 @@ class SecureVisionApp {
         titleEl.textContent = 'ALERTA: PESSOA NÃO CADASTRADA DETECTADA';
         titleEl.style.color = '#ef4444';
       }
-      if (subEl) subEl.textContent = 'Rosto humano detectado na câmera, porém a pessoa NÃO possui cadastro no Banco de Dados Biométrico.';
+      const minPercent = (window.svBiometrics && window.svBiometrics.minUnauthPercentage) || 60;
+      const currentSim = details && details.confidence ? details.confidence : '0.0';
+      if (subEl) subEl.textContent = `Rosto humano detectado na câmera com similaridade biométrica de ${currentSim}%, abaixo da porcentagem mínima configurada (${minPercent}%). Acesso não autorizado.`;
       if (badgeEl) {
         badgeEl.textContent = 'NÃO CADASTRADO / RED ALERT';
         badgeEl.style.background = 'rgba(239,68,68,0.15)';
@@ -1021,20 +1017,16 @@ class SecureVisionApp {
               ? `${match.name} [AUTORIZADO]` 
               : (isBlocked 
                   ? `⛔ ${match.name} [ACESSO BLOQUEADO]` 
-                  : (isAnalyzing 
-                      ? `🔍 ANALISANDO ROSTO... (${match.confidence || 0}%)` 
-                      : (match.label || '🚨 RED ALERT - NÃO AUTORIZADO')))));
+                  : '🚨 PESSOA NÃO CADASTRADA')));
     const subText = isTooFar
       ? 'Aproxime-se para identificação'
       : (isSpoofed
           ? 'SPOOFING / LIVENESS REJEITADO (0.0%)'
           : (isAuthorized 
-              ? `Confiança: ${match.confidence}%` 
+              ? `Confiança: ${match.confidence}% (Mínimo: ${minPercent}%)` 
               : (isBlocked 
                   ? `LISTA NEGRA / ALERTA CRÍTICO (${match.confidence}%)` 
-                  : (isAnalyzing 
-                      ? `Aguardando confiança mínima (${minPercent}%)` 
-                      : `Confiança: ${match.confidence}% - Pessoa Não Cadastrada`))));
+                  : `Similaridade: ${match.confidence || 0}% (Abaixo do Mínimo de ${minPercent}%)`)));
 
     ctx.font = 'bold 11px JetBrains Mono, monospace';
     const textWidth = ctx.measureText(labelText).width;
