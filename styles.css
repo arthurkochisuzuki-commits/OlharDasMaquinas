@@ -583,6 +583,29 @@ body {
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.right-logs-panel.collapsed {
+  display: none !important;
+}
+
+#btnToggleLogs.logs-hidden {
+  color: var(--text-dim);
+  opacity: 0.6;
+  position: relative;
+}
+
+#btnToggleLogs.logs-hidden::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--accent-red);
+  transform: rotate(-45deg);
+  border-radius: 2px;
 }
 
 .logs-header {

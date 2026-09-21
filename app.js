@@ -107,6 +107,29 @@ class SecureVisionApp {
       btnHeaderSettings.addEventListener('click', () => this.switchTab('settings'));
     }
 
+    // Alternar Visualização do Painel de Logs de Segurança (Ícone de Notificações / Sino)
+    const btnToggleLogs = document.getElementById('btnToggleLogs');
+    const rightLogsPanel = document.getElementById('rightLogsPanel');
+    if (btnToggleLogs && rightLogsPanel) {
+      const isLogsHidden = localStorage.getItem('sv_hide_logs') === 'true';
+      if (isLogsHidden) {
+        rightLogsPanel.classList.add('collapsed');
+        btnToggleLogs.classList.add('logs-hidden');
+        btnToggleLogs.title = 'Mostrar Painel de Logs de Segurança';
+      } else {
+        btnToggleLogs.title = 'Ocultar Painel de Logs de Segurança';
+      }
+
+      btnToggleLogs.addEventListener('click', () => {
+        const currentlyHidden = rightLogsPanel.classList.toggle('collapsed');
+        btnToggleLogs.classList.toggle('logs-hidden', currentlyHidden);
+        localStorage.setItem('sv_hide_logs', currentlyHidden ? 'true' : 'false');
+        btnToggleLogs.title = currentlyHidden 
+          ? 'Mostrar Painel de Logs de Segurança' 
+          : 'Ocultar Painel de Logs de Segurança';
+      });
+    }
+
     // Check Connected Cameras Button
     const checkCamBtn = document.getElementById('btnCheckCameras');
     if (checkCamBtn) {
