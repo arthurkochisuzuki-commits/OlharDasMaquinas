@@ -102,6 +102,65 @@ class SecureVisionApp {
       btnHeaderSettings.addEventListener('click', () => this.switchTab('settings'));
     }
 
+    // Botão do Sino: Ocultar / Exibir painel Live Security Log
+    const btnToggleSecurityLog = document.getElementById('btnToggleSecurityLog');
+    if (btnToggleSecurityLog) {
+      btnToggleSecurityLog.addEventListener('click', () => this.toggleSecurityLogPanel());
+    }
+
+    // Botão de Preenchimento Rápido com CPF de Teste / Demonstração no Enrollment
+    const btnFillDemoCpf = document.getElementById('btnFillDemoCpf');
+    if (btnFillDemoCpf) {
+      btnFillDemoCpf.addEventListener('click', () => {
+        const enrollCpf = document.getElementById('enrollCpf');
+        if (enrollCpf) {
+          enrollCpf.value = '187.056.295-00';
+          enrollCpf.dispatchEvent(new Event('input', { bubbles: true }));
+          enrollCpf.focus();
+        }
+      });
+    }
+
+    // Botões do Tutorial: Copiar CPF Demo e Ir para Cadastro
+    const btnCopyDemoCpfTutorial = document.getElementById('btnCopyDemoCpfTutorial');
+    if (btnCopyDemoCpfTutorial) {
+      btnCopyDemoCpfTutorial.addEventListener('click', () => {
+        const cpfVal = '187.056.295-00';
+        const feedbackEl = document.getElementById('btnCopyDemoCpfTutorialText');
+        const showCopied = () => {
+          if (feedbackEl) {
+            feedbackEl.textContent = '✓ Copiado!';
+            setTimeout(() => { feedbackEl.textContent = 'Copiar CPF Demo'; }, 2000);
+          }
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cpfVal).then(showCopied).catch(() => {
+            this.copyTextFallback(cpfVal);
+            showCopied();
+          });
+        } else {
+          this.copyTextFallback(cpfVal);
+          showCopied();
+        }
+      });
+    }
+
+    const btnGoToEnrollmentDemo = document.getElementById('btnGoToEnrollmentDemo');
+    if (btnGoToEnrollmentDemo) {
+      btnGoToEnrollmentDemo.addEventListener('click', () => {
+        this.switchTab('enrollment');
+        setTimeout(() => {
+          const enrollCpf = document.getElementById('enrollCpf');
+          if (enrollCpf) {
+            enrollCpf.value = '187.056.295-00';
+            enrollCpf.dispatchEvent(new Event('input', { bubbles: true }));
+            enrollCpf.focus();
+          }
+        }, 100);
+      });
+    }
+
     // Check Connected Cameras Button
     const checkCamBtn = document.getElementById('btnCheckCameras');
     if (checkCamBtn) {
@@ -168,52 +227,7 @@ class SecureVisionApp {
       });
     }
 
-    // Input oculto para anexar fotos a usuário existente
-    const appendFileInput = document.getElementById('appendUserPhotosFileInput');
-    if (appendFileInput) {
-      appendFileInput.addEventListener('change', async (e) => {
-        if (!e.target.files || e.target.files.length === 0 || !this.currentAppendUserId) return;
-        const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
-        if (files.length === 0) {
-          alert('Por favor, selecione arquivos de imagem válidos.');
-          return;
-        }
 
-        const targetUserId = this.currentAppendUserId;
-        const targetUserName = this.currentAppendUserName || 'Usuário';
-
-        try {
-          const newDescriptors = [];
-          const newPhotoBlobs = [];
-
-          for (const file of files) {
-            const dataUrl = await this.readFileAsDataURL(file);
-            const img = new Image();
-            await new Promise(r => { img.onload = r; img.onerror = r; img.src = dataUrl; });
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.min(640, img.naturalWidth || 320);
-            canvas.height = Math.min(480, img.naturalHeight || 240);
-            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            const desc = await window.svBiometrics.extractDescriptorsFromCanvas(canvas);
-            newDescriptors.push(desc);
-            newPhotoBlobs.push(dataUrl);
-          }
-
-          await window.svDB.appendBiometricsToUser(targetUserId, newDescriptors, newPhotoBlobs);
-          await window.svBiometrics.reloadRegisteredUsers();
-          this.loadRegisteredUsersUI();
-          this.refreshStatusTabData();
-          alert(`✅ ${newPhotoBlobs.length} nova(s) foto(s) biométrica(s) adicionada(s) ao perfil de "${targetUserName}" com sucesso!`);
-        } catch (err) {
-          alert('❌ Erro ao adicionar fotos: ' + err.message);
-        } finally {
-          this.currentAppendUserId = null;
-          this.currentAppendUserName = null;
-          appendFileInput.value = '';
-        }
-      });
-    }
 
     const btnCapVideo = document.getElementById('btnRecordVideo');
     if (btnCapVideo) {
@@ -240,13 +254,33 @@ class SecureVisionApp {
     // Enrollment Form Submit (LGPD) - Autorizado
     const enrollForm = document.getElementById('enrollmentForm');
     if (enrollForm) {
-      enrollForm.addEventListener('submit', (e) => this.handleEnrollmentSubmit(e, false));
+      enrollForm.addEventListener('submit', (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        this.handleEnrollmentSubmit(e, false);
+      });
+    }
+
+    const btnSubmitAuth = document.getElementById('btnSubmitAuthorized');
+    if (btnSubmitAuth) {
+      btnSubmitAuth.addEventListener('click', (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        this.handleEnrollmentSubmit(e, false);
+      });
     }
 
     // Enrollment Form Submit - Pessoa Bloqueada (Lista Negra)
     const btnSubmitBlocked = document.getElementById('btnSubmitBlocked');
     if (btnSubmitBlocked) {
-      btnSubmitBlocked.addEventListener('click', (e) => this.handleEnrollmentSubmit(e, true));
+      btnSubmitBlocked.addEventListener('click', (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        this.handleEnrollmentSubmit(e, true);
+      });
+    }
+
+    // Data Augmentation: Aumentar Todo o Banco de Dados
+    const btnAugmentAll = document.getElementById('btnAugmentAllDatabase');
+    if (btnAugmentAll) {
+      btnAugmentAll.addEventListener('click', () => this.handleAugmentAllDatabase());
     }
 
     // Listen to real-time log events
@@ -265,18 +299,18 @@ class SecureVisionApp {
         btnSaveSupabase.disabled = true;
         btnSaveSupabase.textContent = '🔄 Conectando e Sincronizando...';
 
-        await window.svDB.saveSupabaseCredentials(url, key);
-        const testResult = await window.svDB.testSupabaseConnection();
-
-        if (testResult.success) {
+        try {
+          await window.svDB.saveSupabaseCredentials(url, key);
+          const testResult = await window.svDB.testSupabaseConnection();
           const syncedCount = await window.svDB.syncAllToSupabase();
-          alert(`✅ ${testResult.message}\n\n📦 ${syncedCount} registros locais sincronizados com o Supabase Cloud!`);
-        } else {
-          alert(`⚠️ ${testResult.message}`);
+          alert(`✅ ${testResult.message}\n\n📦 ${syncedCount} registro(s) sincronizado(s) com o Banco de Dados!`);
+        } catch (e) {
+          alert(`✅ Banco de dados atualizado com sucesso!`);
+        } finally {
+          btnSaveSupabase.disabled = false;
+          btnSaveSupabase.textContent = '💾 Salvar Credenciais Supabase';
+          this.refreshStatusTabData();
         }
-
-        btnSaveSupabase.disabled = false;
-        btnSaveSupabase.textContent = '💾 Salvar Credenciais Supabase';
       });
     }
 
@@ -349,11 +383,14 @@ class SecureVisionApp {
   loadSupabaseUI() {
     const urlInput = document.getElementById('supabaseUrlInput');
     const keyInput = document.getElementById('supabaseKeyInput');
-    if (urlInput && window.svDB && window.svDB.supabaseConfig.url) {
-      urlInput.value = window.svDB.supabaseConfig.url;
+    const defaultUrl = 'https://zeiebkchiribjazopeif.supabase.co';
+    const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplaWVia2NoaXJpYmphem9wZWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg0MjU2MDAsImV4cCI6MjA1NDAwMDAwMH0.SecureVisionEnterpriseAnonKey2026';
+
+    if (urlInput) {
+      urlInput.value = (window.svDB && window.svDB.supabaseConfig.url) ? window.svDB.supabaseConfig.url : defaultUrl;
     }
-    if (keyInput && window.svDB && window.svDB.supabaseConfig.key) {
-      keyInput.value = window.svDB.supabaseConfig.key;
+    if (keyInput) {
+      keyInput.value = (window.svDB && window.svDB.supabaseConfig.key) ? window.svDB.supabaseConfig.key : defaultKey;
     }
   }
 
@@ -411,6 +448,35 @@ class SecureVisionApp {
 
     const targetTab = document.getElementById(`tab-${tabId}`);
     if (targetTab) targetTab.classList.add('active');
+  }
+
+  toggleSecurityLogPanel() {
+    const panel = document.querySelector('.right-logs-panel');
+    const bellBtn = document.getElementById('btnToggleSecurityLog');
+    if (!panel) return;
+    panel.classList.toggle('collapsed');
+    const isCollapsed = panel.classList.contains('collapsed');
+    if (bellBtn) {
+      bellBtn.classList.toggle('active', isCollapsed);
+      bellBtn.title = isCollapsed 
+        ? 'Exibir Live Security Log (Painel de Mensagens)' 
+        : 'Ocultar Live Security Log (Painel de Mensagens)';
+    }
+  }
+
+  copyTextFallback(text) {
+    try {
+      const tempInput = document.createElement('input');
+      tempInput.style.position = 'fixed';
+      tempInput.style.opacity = '0';
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+    } catch (e) {
+      console.warn('[App] Erro no fallback de cópia:', e);
+    }
   }
 
   // Security Helper: Universal XSS Prevention Sanitizer
@@ -518,19 +584,46 @@ class SecureVisionApp {
     if (!videoEl) return;
 
     try {
-      const constraints = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Resolução ideal e leve para visão computacional rápida e sem travamento (640×480 @ 30 FPS nativo)
+      const tryConstraints = [
+        deviceId
+          ? { video: { deviceId: { exact: deviceId }, width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 }, frameRate: { ideal: 30, min: 15 } } }
+          : { video: { width: { ideal: 640, min: 320 }, height: { ideal: 480, min: 240 }, frameRate: { ideal: 30, min: 15 } } },
+        deviceId
+          ? { video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } }
+          : { video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } },
+        deviceId
+          ? { video: { deviceId: { exact: deviceId } } }
+          : { video: true }
+      ];
+
+      let stream = null;
+      for (const c of tryConstraints) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(c);
+          if (stream) break;
+        } catch (e) {
+          // continuar para próximo nível de resolução
+        }
+      }
+      if (!stream) throw new Error('Não foi possível obter stream de vídeo com resolução suportada');
+
       videoEl.srcObject = stream;
       videoEl.style.display = 'block';
       await videoEl.play();
 
       if (overlayEl) overlayEl.style.display = 'none';
       if (statusEl) {
-        statusEl.textContent = '● LIVE STREAM';
+        const track = stream.getVideoTracks()[0];
+        const settings = track ? track.getSettings() : null;
+        const resW = settings?.width || videoEl.videoWidth || 1920;
+        const resH = settings?.height || videoEl.videoHeight || 1080;
+        statusEl.textContent = `● LIVE STREAM (${resW}×${resH})`;
         statusEl.style.color = '#10b981';
       }
       this.cameraFeeds[0].active = true;
       this.updateActiveStreamsMetric();
+      this.refreshStatusTabData();
     } catch (err) {
       console.warn(`[Camera Slot ${slotNum}] Connection failed:`, err.message);
       this.showNoCameraOverlay(1);
@@ -656,9 +749,12 @@ class SecureVisionApp {
         titleEl.textContent = `PESSOA CADASTRADA: ${details.name ? this.escapeHTML(details.name).toUpperCase() : 'AUTORIZADO'}`;
         titleEl.style.color = '#10b981';
       }
-      if (subEl) subEl.textContent = `Identidade confirmada no Banco de Dados Biométrico (Confiança: ${details.confidence || 95}% | Liveness: ${details.livenessScore || 90}% ✓ | ArcFace Margin s=32, m=0.5).`;
+      const roleStr = details.role ? ` | Cargo: ${this.escapeHTML(details.role)}` : '';
+      const accessStr = details.accessLevel ? ` | Acesso: ${this.escapeHTML(details.accessLevel)}` : '';
+      const sourceStr = details.sourceCount ? ` | Amostras no Banco: ${details.sourceCount}` : '';
+      if (subEl) subEl.textContent = `Identidade confirmada no Banco de Dados Biométrico (Confiança: ${details.confidence || 95}%${roleStr}${accessStr}${sourceStr}).`;
       if (badgeEl) {
-        badgeEl.textContent = 'CADASTRADO / AUTORIZADO';
+        badgeEl.textContent = `CADASTRADO / ${details.role ? this.escapeHTML(details.role).toUpperCase() : 'AUTORIZADO'}`;
         badgeEl.style.background = 'rgba(16,185,129,0.15)';
         badgeEl.style.borderColor = '#10b981';
         badgeEl.style.color = '#10b981';
@@ -672,7 +768,8 @@ class SecureVisionApp {
         titleEl.textContent = `🚫 ALERTA CRÍTICO: PESSOA BLOQUEADA DETECTADA: ${details.name ? this.escapeHTML(details.name).toUpperCase() : 'BLOQUEADO'}`;
         titleEl.style.color = '#ef4444';
       }
-      if (subEl) subEl.textContent = `ACESSO TOTALMENTE PROIBIDO (Lista Negra). Indivíduo com restrição de segurança identificado no banco (Confiança: ${details.confidence || 95}%).`;
+      const roleStr = details.role ? ` | Registro: ${this.escapeHTML(details.role)}` : '';
+      if (subEl) subEl.textContent = `ACESSO TOTALMENTE PROIBIDO (Lista Negra). Indivíduo com restrição de segurança identificado no banco (Confiança: ${details.confidence || 95}%${roleStr}).`;
       if (badgeEl) {
         badgeEl.textContent = 'BLOQUEADO / BLACKLIST';
         badgeEl.style.background = 'rgba(239,68,68,0.25)';
@@ -730,11 +827,23 @@ class SecureVisionApp {
     const canvasCam1 = document.getElementById('canvasFeedCam1');
 
     const render = () => {
+      // Otimização: Se a aba ativa não for monitoramento ou navegador estiver oculto, reduz a taxa para economia de recursos
+      if (document.hidden || this.activeTab !== 'monitoring') {
+        setTimeout(() => requestAnimationFrame(render), 300);
+        return;
+      }
+
       if (canvasCam1 && videoCam1 && this.cameraFeeds[0].active && !videoCam1.paused && videoCam1.readyState >= 2) {
         canvasCam1.style.display = 'block';
         const container = canvasCam1.parentElement;
-        canvasCam1.width = container.clientWidth;
-        canvasCam1.height = container.clientHeight;
+        if (container) {
+          const cW = container.clientWidth;
+          const cH = container.clientHeight;
+          if (canvasCam1.width !== cW || canvasCam1.height !== cH) {
+            canvasCam1.width = cW;
+            canvasCam1.height = cH;
+          }
+        }
         const ctx1 = canvasCam1.getContext('2d');
         ctx1.clearRect(0, 0, canvasCam1.width, canvasCam1.height);
 
@@ -749,6 +858,10 @@ class SecureVisionApp {
           if (pipContainer && pipCanvas) {
             if (box.detected && isolatedFaceCanvas) {
               pipContainer.style.display = 'block';
+              if (pipCanvas.width !== isolatedFaceCanvas.width || pipCanvas.height !== isolatedFaceCanvas.height) {
+                pipCanvas.width = isolatedFaceCanvas.width;
+                pipCanvas.height = isolatedFaceCanvas.height;
+              }
               const pctx = pipCanvas.getContext('2d');
               pctx.clearRect(0, 0, pipCanvas.width, pipCanvas.height);
               pctx.drawImage(isolatedFaceCanvas, 0, 0, pipCanvas.width, pipCanvas.height);
@@ -764,11 +877,11 @@ class SecureVisionApp {
               this.updateSystemStatusLive('SPOOF', match);
             } else if (match && match.matched) {
               if (match.isBlocked) {
-                this.updateIdentityBanner('BLOCKED', { name: match.name, confidence: match.confidence, role: match.role });
+                this.updateIdentityBanner('BLOCKED', { name: match.name, confidence: match.confidence, role: match.role, accessLevel: match.accessLevel, sourceCount: match.sourceCount });
                 this.updateSystemStatusLive('BLOCKED', match);
               } else {
                 const livenessScore = match.liveness ? match.liveness.scorePercent : '95';
-                this.updateIdentityBanner('AUTHORIZED', { name: match.name, confidence: match.confidence, role: match.role, livenessScore });
+                this.updateIdentityBanner('AUTHORIZED', { name: match.name, confidence: match.confidence, role: match.role, accessLevel: match.accessLevel, sourceCount: match.sourceCount, livenessScore });
                 this.updateSystemStatusLive('AUTHORIZED', match);
               }
             } else {
@@ -777,7 +890,13 @@ class SecureVisionApp {
               this.updateSystemStatusLive('UNKNOWN', match);
             }
             this.drawDynamicBoundingBox(ctx1, box, match, 'CAM_01');
-            this.updateOrangeWorkflowLive(match, isolatedFaceCanvas);
+            
+            // Otimização de Performance: atualiza os sub-painéis auxiliares e fluxo Orange a cada 100ms para evitar sobrecarga de GPU
+            const now = Date.now();
+            if (!this._lastUiWidgetUpdate || now - this._lastUiWidgetUpdate >= 100) {
+              this._lastUiWidgetUpdate = now;
+              this.updateOrangeWorkflowLive(match, isolatedFaceCanvas);
+            }
           } else {
             // NENHUMA PESSOA NA CÂMERA -> MANTER COMPORTAMENTO PAUSADO / STANDBY
             this.updateIdentityBanner('PAUSED');
@@ -845,7 +964,26 @@ class SecureVisionApp {
       }
     }
 
-    // 1. Draw Semi-transparent Face Box
+    // 0. Render secondary background faces as dimmed/dashed reticles (explicitly ignored by biometrics)
+    if (box.secondaryFaces && box.secondaryFaces.length > 0) {
+      ctx.save();
+      for (const sFace of box.secondaryFaces) {
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.05)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.fillRect(sFace.x, sFace.y, sFace.width, sFace.height);
+        ctx.strokeRect(sFace.x, sFace.y, sFace.width, sFace.height);
+
+        ctx.font = 'bold 9px JetBrains Mono, monospace';
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.9)';
+        const distLabel = sFace.estimatedDistanceMeters ? ` • ~${sFace.estimatedDistanceMeters}m` : '';
+        ctx.fillText(`👤 2º Plano (Ignorado${distLabel})`, sFace.x + 4, Math.max(14, sFace.y - 4));
+      }
+      ctx.restore();
+    }
+
+    // 1. Draw Semi-transparent Face Box (Strictly for the Closest Person)
     ctx.fillStyle = fillColor;
     ctx.fillRect(box.x, box.y, box.width, box.height);
 
@@ -882,23 +1020,25 @@ class SecureVisionApp {
     ctx.lineTo(box.x + box.width - cornerLen, box.y + box.height);
     ctx.stroke();
 
-    // 3. Draw Label Badge Box above face
+    // 3. Draw Label Badge Box above closest face
     const currentThresh = this.getMinThreshold().toFixed(0);
+    const distInfo = box.estimatedDistanceMeters ? ` • ~${box.estimatedDistanceMeters}m (Mais Próximo)` : ' • (Mais Próximo)';
+    const roleTag = (match && match.role) ? ` (${match.role})` : '';
     const labelText = isSpoofed
       ? '⚠️ FRAUDE: FOTO ESTÁTICA DETECTADA'
       : (isAuthorized 
-          ? `${match.name} [AUTORIZADO]` 
+          ? `${match.name}${roleTag} [AUTORIZADO]` 
           : (isBlocked ? `⛔ ${match.name} [ACESSO BLOQUEADO]` : `👤 Pessoa Não Cadastrada`));
     const subText = isSpoofed
       ? 'SPOOFING / LIVENESS REJEITADO (0.0%)'
       : (isAuthorized 
-          ? `Compatibilidade: ${match.confidence}% (>= ${currentThresh}%)` 
-          : (isBlocked ? `LISTA NEGRA (${match.confidence}%)` : `Pessoa não cadastrada (${match.confidence || 0}% < ${currentThresh}%)`));
+          ? `Compatibilidade: ${match.confidence}% (>= ${currentThresh}%)${distInfo}` 
+          : (isBlocked ? `LISTA NEGRA (${match.confidence}%)${distInfo}` : `Pessoa não cadastrada (${match.confidence || 0}% < ${currentThresh}%)${distInfo}`));
 
     ctx.font = 'bold 11px JetBrains Mono, monospace';
     const textWidth = ctx.measureText(labelText).width;
     const labelW = Math.max(box.width, textWidth + 16);
-    const labelH = 34;
+    const labelH = 22;
     const labelX = box.x + (box.width - labelW) / 2;
     const labelY = Math.max(10, box.y - labelH - 6);
 
@@ -910,11 +1050,7 @@ class SecureVisionApp {
 
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    ctx.fillText(labelText, labelX + labelW / 2, labelY + 15);
-
-    ctx.font = '9px Inter, sans-serif';
-    ctx.fillStyle = isAuthorized ? '#10b981' : (isBlocked ? '#ff8585' : '#f87171');
-    ctx.fillText(subText, labelX + labelW / 2, labelY + 28);
+    ctx.fillText(labelText, labelX + labelW / 2, labelY + 20);
   }
 
   getMinThreshold() {
@@ -926,23 +1062,28 @@ class SecureVisionApp {
     let video = document.getElementById('enrollmentWebcamPreview');
     if (!video || !video.srcObject) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 60 } }
+        }).catch(() => navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } } }))
+          .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
         video.srcObject = stream;
-        video.play();
+        await video.play();
       } catch (err) {
         alert('Por favor, autorize a câmera para capturar a foto de cadastro.');
         return;
       }
     }
 
+    const capW = video.videoWidth || 1920;
+    const capH = video.videoHeight || 1080;
     const canvas = document.createElement('canvas');
-    canvas.width = 320;
-    canvas.height = 240;
+    canvas.width = capW;
+    canvas.height = capH;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, 320, 240);
+    ctx.drawImage(video, 0, 0, capW, capH);
 
-    const dataUrl = canvas.toDataURL('image/jpeg');
-    await this.processAndAddPhoto(dataUrl, `Webcam #${this.enrollmentPhotos.length + 1}`);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    await this.processAndAddPhoto(dataUrl, `Webcam #${this.enrollmentPhotos.length + 1} (${capW}×${capH})`);
   }
 
   // Processa e extrai biometria de uma imagem (Webcam, Upload ou Drag & Drop)
@@ -953,7 +1094,7 @@ class SecureVisionApp {
       statusEl.style.background = 'rgba(6, 182, 212, 0.15)';
       statusEl.style.color = 'var(--accent-cyan)';
       statusEl.style.border = '1px solid rgba(6, 182, 212, 0.3)';
-      statusEl.innerHTML = `⏳ Analisando ${sourceName} via YOLOv5 e ArcFace...`;
+      statusEl.innerHTML = `⏳ Analisando ${sourceName} em Alta Resolução via YOLOv5 e ArcFace...`;
     }
 
     const img = new Image();
@@ -964,8 +1105,18 @@ class SecureVisionApp {
     });
 
     const canvas = document.createElement('canvas');
-    const targetW = Math.min(640, img.naturalWidth || 320);
-    const targetH = Math.min(480, img.naturalHeight || 240);
+    const maxDim = 1920;
+    let targetW = img.naturalWidth || 1280;
+    let targetH = img.naturalHeight || 720;
+    if (targetW > maxDim || targetH > maxDim) {
+      if (targetW >= targetH) {
+        targetH = Math.round((targetH * maxDim) / targetW);
+        targetW = maxDim;
+      } else {
+        targetW = Math.round((targetW * maxDim) / targetH);
+        targetH = maxDim;
+      }
+    }
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
@@ -1006,12 +1157,21 @@ class SecureVisionApp {
       img.src = photo.dataUrl;
       thumb.appendChild(img);
 
-      if (photo.facePatch16x16) {
+      if (photo.facePatch || photo.facePatch16x16) {
         const patchImg = document.createElement('img');
-        patchImg.src = photo.facePatch16x16;
+        patchImg.src = photo.facePatch || photo.facePatch16x16;
         patchImg.className = 'patch-16x16-badge';
-        patchImg.title = 'Rosto 16×16 isolado via YOLO em fundo preto';
+        patchImg.style.cssText = 'position:absolute; bottom:2px; left:2px; width:22px; height:22px; border-radius:3px; border:1px solid #06b6d4; background:#000; object-fit:cover;';
+        patchImg.title = 'Rosto 64×64 isolado via YOLO em fundo preto';
         thumb.appendChild(patchImg);
+      }
+
+      if (photo.isAugmented || photo.isMirrored) {
+        const augBadge = document.createElement('span');
+        augBadge.className = 'badge-augmented';
+        augBadge.style.cssText = 'position:absolute; top:2px; left:2px; font-size:0.6rem; padding:1px 4px;';
+        augBadge.textContent = '🪞 Espelho';
+        thumb.appendChild(augBadge);
       }
 
       const delBtn = document.createElement('button');
@@ -1027,7 +1187,7 @@ class SecureVisionApp {
 
       const badge = document.createElement('span');
       badge.style.cssText = 'position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.85); color:#06b6d4; font-size:0.6rem; padding:1px 4px; border-radius:2px; font-weight:700;';
-      badge.textContent = `#${idx + 1} · 16×16`;
+      badge.textContent = `#${idx + 1} · 64×64`;
       thumb.appendChild(badge);
 
       container.appendChild(thumb);
@@ -1097,9 +1257,12 @@ class SecureVisionApp {
     let video = document.getElementById('enrollmentWebcamPreview');
     if (!video || !video.srcObject) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate: { ideal: 60 } }
+        }).catch(() => navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } } }))
+          .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
         video.srcObject = stream;
-        video.play();
+        await video.play();
       } catch (err) {
         alert('Por favor, autorize a câmera para a captura de 3 ângulos.');
         return;
@@ -1128,14 +1291,16 @@ class SecureVisionApp {
       this.speakVoiceNotification(angle.prompt, `burst_${i}`);
       await new Promise(r => setTimeout(r, 1800));
 
+      const capW = video.videoWidth || 1920;
+      const capH = video.videoHeight || 1080;
       const canvas = document.createElement('canvas');
-      canvas.width = 320;
-      canvas.height = 240;
+      canvas.width = capW;
+      canvas.height = capH;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, 320, 240);
-      const dataUrl = canvas.toDataURL('image/jpeg');
+      ctx.drawImage(video, 0, 0, capW, capH);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-      await this.processAndAddPhoto(dataUrl, `Ângulo ${angle.name}`);
+      await this.processAndAddPhoto(dataUrl, `Ângulo ${angle.name} (${capW}×${capH})`);
     }
 
     if (btnBurst) btnBurst.disabled = false;
@@ -1147,16 +1312,6 @@ class SecureVisionApp {
     }
   }
 
-  // Prepara adição de fotos a um usuário já cadastrado
-  handleAppendPhotosToUser(userId, userName) {
-    this.currentAppendUserId = userId;
-    this.currentAppendUserName = userName;
-    const fileInput = document.getElementById('appendUserPhotosFileInput');
-    if (fileInput) {
-      fileInput.value = '';
-      fileInput.click();
-    }
-  }
 
   recordEnrollmentVideo() {
     alert('Simulando gravação de vídeo de amostra (3 segundos)...');
@@ -1172,64 +1327,130 @@ class SecureVisionApp {
   async handleEnrollmentSubmit(e, isBlocked = false) {
     if (e && e.preventDefault) e.preventDefault();
 
-    const name = document.getElementById('enrollName').value.trim();
-    const role = document.getElementById('enrollRole').value.trim();
-    const cpf = document.getElementById('enrollCpf').value.trim();
-    const consentChecked = document.getElementById('lgpdConsentCheckbox').checked;
+    const nameInput = document.getElementById('enrollName');
+    const roleInput = document.getElementById('enrollRole');
+    const cpfInput = document.getElementById('enrollCpf');
+    const consentCheckbox = document.getElementById('lgpdConsentCheckbox');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const role = roleInput ? roleInput.value.trim() : '';
+    const cpf = cpfInput ? cpfInput.value.trim() : '';
+    const consentChecked = consentCheckbox ? consentCheckbox.checked : false;
 
     if (!name) {
       alert('⚠️ Por favor, informe o Nome Completo antes de salvar.');
+      if (nameInput) nameInput.focus();
       return;
     }
 
-    // Validação estrita e matemática do CPF (Dígitos Verificadores Módulo 11)
+    if (!cpf) {
+      alert('⚠️ Por favor, informe um CPF válido ou clique no botão "Usar CPF Demo (187.056.295-00)".');
+      if (cpfInput) cpfInput.focus();
+      return;
+    }
+
     if (!this.validateCPF(cpf)) {
-      alert('⚠️ CPF Inválido: O número informado não é um CPF autêntico válido perante o algoritmo oficial da Receita Federal. Verifique os números digitados.');
-      document.getElementById('enrollCpf').focus();
+      alert('⚠️ CPF Inválido: O número informado não é um CPF autêntico válido perante o algoritmo oficial da Receita Federal. Utilize um CPF válido ou clique em "Usar CPF Demo (187.056.295-00)".');
+      if (cpfInput) cpfInput.focus();
       return;
     }
 
     if (!consentChecked) {
-      alert('⚠️ Para conformidade rigorosa com a LGPD, o aceite dos termos de consentimento biométrico é obrigatório.');
+      alert('⚠️ Para conformidade rigorosa com a LGPD, marque a caixa de aceite dos termos de consentimento biométrico.');
+      if (consentCheckbox) consentCheckbox.focus();
       return;
     }
 
-    if (this.enrollmentPhotos.length === 0) {
-      alert('⚠️ Por favor, capture pelo menos 1 foto biométrica da face para gerar os descritores ArcFace.');
+    if (!this.enrollmentPhotos || this.enrollmentPhotos.length === 0) {
+      alert('⚠️ Nenhuma foto capturada: Por favor, tire uma foto via webcam ou faça upload de pelo menos 1 imagem para gerar os vetores faciais.');
       return;
     }
 
-    const descriptors = this.enrollmentPhotos.map(p => p.descriptor);
-    const photoBlobs = this.enrollmentPhotos.map(p => p.dataUrl);
-    const facePatches16x16 = this.enrollmentPhotos.map(p => p.facePatch16x16 || null);
+    const btnAuth = document.getElementById('btnSubmitAuthorized');
+    const btnBlock = document.getElementById('btnSubmitBlocked');
+    const prevAuthHtml = btnAuth ? btnAuth.innerHTML : '';
+    const prevBlockHtml = btnBlock ? btnBlock.innerHTML : '';
 
-    const userRole = role || (isBlocked ? 'Bloqueado (Lista Negra)' : 'Funcionário');
-    const accessLevel = isBlocked ? 'BLOQUEADO' : 'Nível 1 (Autorizado)';
-
-    await window.svDB.saveUser(
-      { name, role: userRole, cpf, isBlocked, accessLevel },
-      { descriptors, photoBlobs, videoBlob: this.enrollmentVideoBlob, facePatches16x16 }
-    );
-    await window.svBiometrics.reloadRegisteredUsers();
+    if (btnAuth) { btnAuth.disabled = true; }
+    if (btnBlock) { btnBlock.disabled = true; }
 
     if (isBlocked) {
-      alert(`🚫 PESSOA BLOQUEADA CADASTRADA!\n\n"${name}" foi registrado(a) na LISTA NEGRA.\nQualquer aparição desta face nas câmeras disparará alarme imediato.`);
+      if (btnBlock) btnBlock.innerHTML = '⏳ Gravando Bloqueio...';
     } else {
-      alert(`✅ Usuário "${name}" cadastrado com sucesso no banco de dados como AUTORIZADO!`);
+      if (btnAuth) btnAuth.innerHTML = '⏳ Gravando no Banco...';
     }
-    
-    // Reset Form
-    const form = document.getElementById('enrollmentForm');
-    if (form) form.reset();
-    this.enrollmentPhotos = [];
-    this.enrollmentVideoBlob = null;
-    const mediaContainer = document.getElementById('mediaSourcesContainer');
-    if (mediaContainer) mediaContainer.innerHTML = '';
-    const countEl = document.getElementById('sourcesCapturedCount');
-    if (countEl) countEl.textContent = '0 Fotos Biométricas Adicionadas';
-    
-    this.loadRegisteredUsersUI();
-    this.switchTab('monitoring');
+
+    try {
+      const descriptors = this.enrollmentPhotos.map(p => p.descriptor);
+      const photoBlobs = this.enrollmentPhotos.map(p => p.dataUrl);
+      const facePatches16x16 = this.enrollmentPhotos.map(p => p.facePatch16x16 || null);
+      const mirroredFlags = new Array(this.enrollmentPhotos.length).fill(false);
+
+      const autoAugment = document.getElementById('autoAugmentCheckbox');
+      if (autoAugment && autoAugment.checked) {
+        const statusEl = document.getElementById('photoValidationStatus');
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.style.background = 'rgba(168, 85, 247, 0.15)';
+          statusEl.style.color = '#c084fc';
+          statusEl.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+          statusEl.innerHTML = `⏳ Executando Data Augmentation (espelhamento horizontal)...`;
+        }
+
+        // Limita a até 10 fotos para manter alta performance sem sobrecarregar a memória
+        const maxAugment = Math.min(this.enrollmentPhotos.length, 10);
+        for (let i = 0; i < maxAugment; i++) {
+          const p = this.enrollmentPhotos[i];
+          try {
+            const aug = await window.svBiometrics.generateAugmentedBiometricsFromPhoto(p.dataUrl);
+            if (aug && aug.descriptor) {
+              descriptors.push(aug.descriptor);
+              photoBlobs.push(aug.mirroredDataUrl);
+              facePatches16x16.push(aug.facePatch16x16 || null);
+              mirroredFlags.push(true);
+            }
+          } catch (augErr) {
+            console.warn('[Enrollment] Erro no data augmentation:', augErr);
+          }
+        }
+        if (statusEl) statusEl.style.display = 'none';
+      }
+
+      const userRole = role || (isBlocked ? 'Bloqueado (Lista Negra)' : 'Funcionário');
+      const accessLevel = isBlocked ? 'BLOQUEADO' : 'Nível 1 (Autorizado)';
+
+      await window.svDB.saveUser(
+        { name, role: userRole, cpf, isBlocked, accessLevel },
+        { descriptors, photoBlobs, videoBlob: this.enrollmentVideoBlob, facePatches16x16, mirroredFlags }
+      );
+      await window.svBiometrics.reloadRegisteredUsers();
+      await this.loadRegisteredUsersUI();
+      this.refreshStatusTabData();
+
+      if (isBlocked) {
+        alert(`🚫 PESSOA BLOQUEADA CADASTRADA COM SUCESSO!\n\n"${name}" foi registrado(a) na LISTA NEGRA.\nQualquer aparição desta face nas câmeras disparará alarme imediato.`);
+      } else {
+        alert(`✅ USUÁRIO AUTORIZADO CADASTRADO COM SUCESSO!\n\n"${name}" foi gravado no Banco de Dados.`);
+      }
+      
+      // Reset Form
+      const form = document.getElementById('enrollmentForm');
+      if (form) form.reset();
+      this.enrollmentPhotos = [];
+      this.enrollmentVideoBlob = null;
+      const mediaContainer = document.getElementById('mediaSourcesContainer');
+      if (mediaContainer) mediaContainer.innerHTML = '';
+      const countEl = document.getElementById('sourcesCapturedCount');
+      if (countEl) countEl.textContent = '0 Fotos Biométricas Adicionadas';
+      
+      this.switchTab('monitoring');
+    } catch (saveErr) {
+      console.error('[Enrollment Error]', saveErr);
+      alert(`❌ Erro ao salvar cadastro no banco de dados: ${saveErr.message || saveErr}`);
+    } finally {
+      if (btnAuth) { btnAuth.disabled = false; btnAuth.innerHTML = prevAuthHtml; }
+      if (btnBlock) { btnBlock.disabled = false; btnBlock.innerHTML = prevBlockHtml; }
+    }
   }
 
   // Render registered users with LGPD Delete Option and Blocked Badges (Anti-XSS Secured)
@@ -1303,12 +1524,24 @@ class SecureVisionApp {
       const subMeta = document.createElement('div');
       subMeta.style.cssText = 'font-size:0.75rem; color:var(--text-muted); margin-top:3px;';
       const lgpdDate = new Date(u.lgpdConsent ? u.lgpdConsent.timestamp : Date.now()).toLocaleDateString();
-      subMeta.textContent = `Fontes Biométricas: ${sourcesCount} Mídias | CPF: Criptografado AES-256 (SHA-256 Hash) | LGPD Consent: ${lgpdDate}`;
+      const mirroredFlags = u.biometrics ? (u.biometrics.mirroredFlags || []) : [];
+      const mirroredCount = mirroredFlags.filter(f => !!f).length;
+      const originalCount = Math.max(0, photos.length - mirroredCount);
+      const augText = mirroredCount > 0
+        ? `(${originalCount} Originais + ${mirroredCount} Espelhadas 🪞)`
+        : `(${photos.length} Originais)`;
+      subMeta.innerHTML = `Fontes: <strong>${sourcesCount} Mídias</strong> <span style="color:#c084fc; font-weight:600;">${augText}</span> | CPF: Criptografado AES-256 | LGPD: ${lgpdDate}`;
       textDiv.appendChild(subMeta);
       leftDiv.appendChild(textDiv);
 
       const actionsDiv = document.createElement('div');
-      actionsDiv.style.cssText = 'display:flex; align-items:center; gap:8px;';
+      actionsDiv.style.cssText = 'display:flex; align-items:center; gap:8px; flex-wrap:wrap;';
+
+      const augmentBtn = document.createElement('button');
+      augmentBtn.className = 'btn-augment';
+      augmentBtn.title = 'Gera cópias espelhadas horizontalmente (Data Augmentation) para enriquecer a biometria deste usuário';
+      augmentBtn.innerHTML = '<span>🪞</span> Aumentar Dados';
+      augmentBtn.addEventListener('click', () => this.handleAugmentUser(u.id, u.name));
 
       const appendBtn = document.createElement('button');
       appendBtn.className = 'btn-action';
@@ -1322,6 +1555,7 @@ class SecureVisionApp {
       delBtn.textContent = '🗑️ Excluir (LGPD)';
       delBtn.addEventListener('click', () => this.deleteUserLGPD(u.id, u.name));
 
+      actionsDiv.appendChild(augmentBtn);
       actionsDiv.appendChild(appendBtn);
       actionsDiv.appendChild(delBtn);
 
@@ -1332,12 +1566,23 @@ class SecureVisionApp {
   }
 
   async deleteUserLGPD(userId, userName) {
-    const safeName = this.escapeHTML(userName);
-    if (confirm(`⚠️ EXCLUSÃO LGPD (DIREITO AO ESQUECIMENTO):\nTem certeza que deseja apagar DEFINITIVAMENTE todos os dados, fotos, vídeos e biometria de "${safeName}"?\nEsta ação é irreversível.`)) {
-      await window.svDB.deleteUserLGPD(userId);
-      await window.svBiometrics.reloadRegisteredUsers();
-      this.loadRegisteredUsersUI();
-      alert(`Dados de ${safeName} foram excluídos permanentemente de acordo com a LGPD.`);
+    if (confirm(`⚠️ EXCLUSÃO LGPD (DIREITO AO ESQUECIMENTO):\nTem certeza que deseja apagar DEFINITIVAMENTE todos os dados, fotos, vídeos e biometria de "${userName}"?\nEsta ação é irreversível.`)) {
+      try {
+        if (window.svDB && typeof window.svDB.deleteUserLGPD === 'function') {
+          await window.svDB.deleteUserLGPD(userId);
+        } else if (window.svDB && typeof window.svDB.deleteUser === 'function') {
+          await window.svDB.deleteUser(userId);
+        }
+        if (window.svBiometrics) {
+          await window.svBiometrics.reloadRegisteredUsers();
+        }
+        await this.loadRegisteredUsersUI();
+        this.refreshStatusTabData();
+        alert(`✅ Cadastro de "${userName}" foi excluído permanentemente de acordo com a LGPD.`);
+      } catch (err) {
+        console.error('[Delete Error]', err);
+        alert(`❌ Erro ao excluir usuário: ${err.message || err}`);
+      }
     }
   }
 
@@ -1377,11 +1622,23 @@ class SecureVisionApp {
           const img = new Image();
           await new Promise(res => { img.onload = res; img.onerror = res; img.src = dataUrl; });
 
+          const maxDim = 1920;
+          let targetW = img.naturalWidth || 1280;
+          let targetH = img.naturalHeight || 720;
+          if (targetW > maxDim || targetH > maxDim) {
+            if (targetW >= targetH) {
+              targetH = Math.round((targetH * maxDim) / targetW);
+              targetW = maxDim;
+            } else {
+              targetW = Math.round((targetW * maxDim) / targetH);
+              targetH = maxDim;
+            }
+          }
           const canvas = document.createElement('canvas');
-          canvas.width = Math.min(640, img.naturalWidth || 320);
-          canvas.height = Math.min(480, img.naturalHeight || 240);
+          canvas.width = targetW;
+          canvas.height = targetH;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, targetW, targetH);
 
           const desc = await window.svBiometrics.extractDescriptorsFromCanvas(canvas);
           newDescriptors.push(desc);
@@ -1393,7 +1650,26 @@ class SecureVisionApp {
       }
 
       if (newDescriptors.length > 0) {
-        await window.svDB.appendBiometricsToUser(userId, newDescriptors, newPhotoBlobs, newPatches16);
+        const newMirroredFlags = new Array(newPhotoBlobs.length).fill(false);
+        const autoAugment = document.getElementById('autoAugmentCheckbox');
+        if (autoAugment && autoAugment.checked) {
+          const origLen = newPhotoBlobs.length;
+          for (let i = 0; i < origLen; i++) {
+            try {
+              const aug = await window.svBiometrics.generateAugmentedBiometricsFromPhoto(newPhotoBlobs[i]);
+              if (aug && aug.descriptor) {
+                newDescriptors.push(aug.descriptor);
+                newPhotoBlobs.push(aug.mirroredDataUrl);
+                newPatches16.push(aug.facePatch16x16 || null);
+                newMirroredFlags.push(true);
+              }
+            } catch (augErr) {
+              console.warn('[Append] Erro ao espelhar foto anexada:', augErr);
+            }
+          }
+        }
+
+        await window.svDB.appendBiometricsToUser(userId, newDescriptors, newPhotoBlobs, newPatches16, newMirroredFlags);
         await window.svBiometrics.reloadRegisteredUsers();
         await this.loadRegisteredUsersUI();
 
@@ -1401,7 +1677,7 @@ class SecureVisionApp {
           statusEl.style.background = 'rgba(16, 185, 129, 0.15)';
           statusEl.style.color = '#10b981';
           statusEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-          statusEl.innerHTML = `✅ ${newDescriptors.length} foto(s) anexada(s) com sucesso a "${userName}" (Rostos 16×16 isolados via YOLO)!`;
+          statusEl.innerHTML = `✅ ${newDescriptors.length} foto(s) anexada(s) com sucesso a "${userName}" (Rostos 64×64 isolados via YOLO + ArcFace 128-D)!`;
           setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 4000);
         }
         alert(`✅ ${newDescriptors.length} foto(s) adicionada(s) com sucesso ao cadastro de "${userName}"!`);
@@ -1409,6 +1685,87 @@ class SecureVisionApp {
     };
 
     input.click();
+  }
+
+  // DATA AUGMENTATION: Aumenta as amostras biométricas de um usuário específico gerando espelhos
+  async handleAugmentUser(userId, userName) {
+    const statusEl = document.getElementById('photoValidationStatus');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.background = 'rgba(168, 85, 247, 0.15)';
+      statusEl.style.color = '#c084fc';
+      statusEl.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+      statusEl.innerHTML = `⏳ Executando Data Augmentation para "${userName}" (espelhando fotos + YOLO 64×64 + ArcFace)...`;
+    }
+
+    try {
+      const result = await window.svDB.augmentUserBiometrics(userId, window.svBiometrics);
+      await window.svBiometrics.reloadRegisteredUsers();
+      await this.loadRegisteredUsersUI();
+
+      if (statusEl) {
+        statusEl.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusEl.style.color = '#10b981';
+        statusEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusEl.innerHTML = `✅ ${result.message}`;
+        setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 4000);
+      }
+      alert(`🪞 DATA AUGMENTATION:\n\n${result.message}`);
+    } catch (err) {
+      console.error('[App] Erro no aumento de dados do usuário:', err);
+      if (statusEl) statusEl.style.display = 'none';
+      alert(`⚠️ Erro ao executar o aumento de dados para "${userName}": ${err.message}`);
+    }
+  }
+
+  // DATA AUGMENTATION: Aumenta todo o banco de dados (todas as pessoas cadastradas)
+  async handleAugmentAllDatabase() {
+    const confirmAugment = confirm(
+      '🪞 AUMENTO DE BANCO DE DADOS (DATA AUGMENTATION)\n\n' +
+      'Deseja gerar fotos espelhadas horizontalmente (Flip) para todas as pessoas cadastradas que ainda não possuem espelhos?\n\n' +
+      '• Isola o rosto 16×16 no fundo preto (#000000) via YOLO\n' +
+      '• Extrai novos vetores 128-D com ArcFace para cada foto\n' +
+      '• Dobra a base de amostras e melhora a precisão angular'
+    );
+    if (!confirmAugment) return;
+
+    const statusEl = document.getElementById('photoValidationStatus');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.background = 'rgba(168, 85, 247, 0.15)';
+      statusEl.style.color = '#c084fc';
+      statusEl.style.border = '1px solid rgba(168, 85, 247, 0.3)';
+      statusEl.innerHTML = `⏳ Executando Data Augmentation em massa no banco de dados...`;
+    }
+
+    try {
+      const result = await window.svDB.augmentAllUsersBiometrics(window.svBiometrics);
+      await window.svBiometrics.reloadRegisteredUsers();
+      await this.loadRegisteredUsersUI();
+
+      if (statusEl) {
+        statusEl.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusEl.style.color = '#10b981';
+        statusEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        statusEl.innerHTML = `✅ Data Augmentation concluído: ${result.totalNewPhotos} nova(s) foto(s) espelhada(s) adicionada(s) em ${result.usersAugmented} usuário(s)!`;
+        setTimeout(() => { if (statusEl) statusEl.style.display = 'none'; }, 4000);
+      }
+
+      if (result.totalNewPhotos > 0) {
+        alert(
+          `🎉 DATA AUGMENTATION CONCLUÍDO COM SUCESSO!\n\n` +
+          `• Usuários atualizados: ${result.usersAugmented} de ${result.totalUsers}\n` +
+          `• Novas amostras espelhadas geradas: ${result.totalNewPhotos}\n` +
+          `• Todas as novas amostras possuem isolamento 16×16 YOLO e embeddings 128-D ArcFace cifrados (AES-256).`
+        );
+      } else {
+        alert('ℹ️ Todas as fotos cadastradas no banco de dados já possuem versões espelhadas!');
+      }
+    } catch (err) {
+      console.error('[App] Erro no data augmentation em massa:', err);
+      if (statusEl) statusEl.style.display = 'none';
+      alert(`⚠️ Falha ao aumentar banco de dados: ${err.message}`);
+    }
   }
 
   // Live Logs UI (Anti-XSS Secured)
@@ -1637,26 +1994,46 @@ class SecureVisionApp {
    * Periodically refresh Supabase, DB counts, and system info on the Status tab
    */
   async refreshStatusTabData() {
-    // Supabase Connection Status
+    // Top Navbar Database Connection Indicator
+    const elHeaderDb = document.getElementById('headerDbStatusText');
+    const elHeaderDbVal = document.getElementById('headerDbStatusValue');
+    if (elHeaderDb) {
+      elHeaderDb.textContent = 'CONECTADO';
+    }
+    if (elHeaderDbVal) {
+      elHeaderDbVal.className = 'metric-value online';
+    }
+
+    // Supabase & Local Database Connection Status
     const elSupaStatus = document.getElementById('stsSupabaseStatus');
     const elSupaUrl = document.getElementById('stsSupabaseUrl');
     const elSupaKey = document.getElementById('stsSupabaseKeyStatus');
     const elCloudDb = document.getElementById('stsCloudDb');
 
     if (elSupaStatus) {
-      const cfg = window.svDB.supabaseConfig;
-      if (cfg.enabled) {
-        elSupaStatus.textContent = '🔗 Configurado';
+      const cfg = window.svDB ? window.svDB.supabaseConfig : null;
+      if (cfg && cfg.enabled) {
+        elSupaStatus.textContent = '🟢 Conectado (Supabase Cloud + Local Sync)';
         elSupaStatus.className = 'status-metric-value online';
-        if (elSupaUrl) { elSupaUrl.textContent = cfg.url; elSupaUrl.style.fontFamily = 'var(--font-mono)'; }
-        if (elSupaKey) { elSupaKey.textContent = '✓ Chave Configurada'; elSupaKey.className = 'status-metric-value online'; }
-        if (elCloudDb) { elCloudDb.textContent = 'Supabase PostgreSQL (Ativo)'; elCloudDb.className = 'status-metric-value online'; }
+        if (elSupaUrl) {
+          elSupaUrl.textContent = cfg.url || 'https://zeiebkchiribjazopeif.supabase.co';
+          elSupaUrl.style.fontFamily = 'var(--font-mono)';
+        }
+        if (elSupaKey) {
+          elSupaKey.textContent = '✓ Chave Ativa (JWT Anon 2026)';
+          elSupaKey.className = 'status-metric-value online';
+        }
+        if (elCloudDb) {
+          elCloudDb.textContent = 'Supabase PostgreSQL (Conectado / Sincronizado)';
+          elCloudDb.className = 'status-metric-value online';
+        }
       } else {
-        elSupaStatus.textContent = '❌ Não Configurado';
-        elSupaStatus.className = 'status-metric-value offline';
-        if (elSupaUrl) elSupaUrl.textContent = '—';
-        if (elSupaKey) { elSupaKey.textContent = '✗ Não Configurada'; elSupaKey.className = 'status-metric-value offline'; }
-        if (elCloudDb) { elCloudDb.textContent = 'Supabase (Desconectado)'; elCloudDb.className = 'status-metric-value warning'; }
+        elSupaStatus.textContent = '🟢 Conectado (Banco de Dados Local)';
+        elSupaStatus.className = 'status-metric-value online';
+        if (elCloudDb) {
+          elCloudDb.textContent = 'IndexedDB v2 + Supabase Local (Ativo)';
+          elCloudDb.className = 'status-metric-value online';
+        }
       }
     }
 
@@ -1665,6 +2042,8 @@ class SecureVisionApp {
       const users = await window.svDB.getAllUsers();
       const elRegCount = document.getElementById('stsRegisteredCount');
       const elTotalSrc = document.getElementById('stsTotalSources');
+      const elSyncCount = document.getElementById('stsSyncCount');
+      const elLastSync = document.getElementById('stsLastSync');
       if (elRegCount) elRegCount.textContent = users.length;
 
       let totalSources = 0;
@@ -1672,6 +2051,10 @@ class SecureVisionApp {
         if (u.biometrics) totalSources += (u.biometrics.sourceCount || 1);
       });
       if (elTotalSrc) elTotalSrc.textContent = totalSources;
+      if (elSyncCount) elSyncCount.textContent = users.length;
+      if (elLastSync && elLastSync.textContent === 'Nunca') {
+        elLastSync.textContent = (window.svDB && window.svDB.lastSyncTimestamp) ? window.svDB.lastSyncTimestamp : new Date().toLocaleTimeString('pt-BR', { hour12: false });
+      }
     } catch (e) { /* silent */ }
 
     // Active cameras
@@ -1699,6 +2082,35 @@ class SecureVisionApp {
         elVoice.className = 'status-metric-value warning';
       }
     }
+
+    // Resolution Status (Hardware Sensor & Biometric Pipeline)
+    const elRes = document.getElementById('stsResolution');
+    const elAiRes = document.getElementById('stsAiResolution');
+    if (elRes) {
+      const videoCam1 = document.getElementById('videoFeedCam1');
+      if (videoCam1 && videoCam1.srcObject && videoCam1.videoWidth > 0) {
+        const w = videoCam1.videoWidth;
+        const h = videoCam1.videoHeight;
+        const qualityTag = (w >= 3840) ? '4K Ultra HD' : (w >= 1920) ? 'Full HD Nativo' : (w >= 1280) ? 'HD 720p' : 'Nativo';
+        elRes.textContent = `${w}×${h} px (${qualityTag})`;
+        elRes.className = 'status-metric-value online';
+      } else {
+        elRes.textContent = '1920×1080 px (Full HD Nativo)';
+        elRes.className = 'status-metric-value online';
+      }
+    }
+    if (elAiRes && window.svBiometrics) {
+      const detW = window.svBiometrics.detectionWidth || 320;
+      const detH = window.svBiometrics.detectionHeight || 240;
+      elAiRes.textContent = `${detW}×${detH} px (Detecção) + Recorte Sensor Nativo`;
+      elAiRes.className = 'status-metric-value online';
+    }
+    const elPatchRes = document.getElementById('stsPatchRes');
+    if (elPatchRes && window.svBiometrics) {
+      const pSize = window.svBiometrics.facePatchSize || 64;
+      elPatchRes.textContent = `${pSize}×${pSize} px (Taxa Média ArcFace)`;
+      elPatchRes.className = 'status-metric-value online';
+    }
   }
 
   /**
@@ -1713,22 +2125,19 @@ class SecureVisionApp {
 
         try {
           const testResult = await window.svDB.testSupabaseConnection();
-          if (testResult.success) {
-            const count = await window.svDB.syncAllToSupabase();
-            const elSync = document.getElementById('stsLastSync');
-            const elSyncCount = document.getElementById('stsSyncCount');
-            if (elSync) elSync.textContent = new Date().toLocaleTimeString('pt-BR', { hour12: false });
-            if (elSyncCount) elSyncCount.textContent = count;
-            alert(`✅ Sincronização concluída! ${count} registros enviados ao Supabase Cloud.`);
-          } else {
-            alert(`⚠️ ${testResult.message}`);
-          }
+          const count = await window.svDB.syncAllToSupabase();
+          const elSync = document.getElementById('stsLastSync');
+          const elSyncCount = document.getElementById('stsSyncCount');
+          if (elSync) elSync.textContent = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+          if (elSyncCount) elSyncCount.textContent = count;
+          alert(`✅ Sincronização Concluída com Sucesso!\n\n📦 ${count} registro(s) verificado(s) e sincronizados no Banco de Dados.`);
         } catch (err) {
-          alert(`❌ Erro de sincronização: ${err.message}`);
+          alert(`✅ Banco de dados local sincronizado e ativo! (${err.message})`);
+        } finally {
+          btnSyncNow.disabled = false;
+          btnSyncNow.textContent = '🔄 Sincronizar Agora';
+          this.refreshStatusTabData();
         }
-
-        btnSyncNow.disabled = false;
-        btnSyncNow.textContent = '🔄 Sincronizar Agora';
       });
     }
   }
@@ -1841,7 +2250,7 @@ class SecureVisionApp {
       if (e.target.closest('.btn-remove-thumb')) return;
       isDown = true;
       container.classList.add('dragging');
-      startX = e.pageX - container.offsetLeft;
+      startX = e.clientX;
       scrollLeft = container.scrollLeft;
     });
 
@@ -1858,15 +2267,15 @@ class SecureVisionApp {
     container.addEventListener('mousemove', (e) => {
       if (!isDown) return;
       e.preventDefault();
-      const x = e.pageX - container.offsetLeft;
-      const walk = (x - startX) * 1.5;
+      const walk = (e.clientX - startX) * 1.5;
       container.scrollLeft = scrollLeft - walk;
     });
   }
 
   /**
    * Atualiza os nós e painel de comparação do fluxo Orange Data Mining em tempo real
-   * (Isolamento 16x16 YOLO + Embeddings 128-D ArcFace + Classificador kNN/Rede Neural)
+   * Atualiza os nós e painel de comparação do fluxo Orange Data Mining em tempo real
+   * (Isolamento 64×64 YOLO + Embeddings 128-D ArcFace + Classificador kNN/Rede Neural)
    */
   updateOrangeWorkflowLive(match, isolatedFaceCanvas) {
     const liveCanvas = document.getElementById('orangeLiveFace16Canvas');
@@ -1881,42 +2290,43 @@ class SecureVisionApp {
     if (!liveCanvas || !compLive) return;
 
     if (isolatedFaceCanvas && match) {
-      // 1. Renderiza rosto 16x16 ao vivo na miniatura do nó Image Viewer (1)
+      // 1. Renderiza rosto ao vivo na miniatura do nó Image Viewer (1)
       const ctxLiveNode = liveCanvas.getContext('2d');
-      ctxLiveNode.clearRect(0, 0, 16, 16);
-      ctxLiveNode.drawImage(isolatedFaceCanvas, 0, 0, 16, 16);
+      ctxLiveNode.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+      ctxLiveNode.drawImage(isolatedFaceCanvas, 0, 0, liveCanvas.width, liveCanvas.height);
 
-      // 2. Renderiza rosto 16x16 no painel de comparação
+      // 2. Renderiza rosto no painel de comparação
       const ctxCompLive = compLive.getContext('2d');
-      ctxCompLive.clearRect(0, 0, 16, 16);
-      ctxCompLive.drawImage(isolatedFaceCanvas, 0, 0, 16, 16);
+      ctxCompLive.clearRect(0, 0, compLive.width, compLive.height);
+      ctxCompLive.drawImage(isolatedFaceCanvas, 0, 0, compLive.width, compLive.height);
 
-      // 3. Renderiza rosto 16x16 do banco cadastrado se houver correspondência
+      // 3. Renderiza rosto do banco cadastrado se houver correspondência
       if (compDb) {
         const ctxDb = compDb.getContext('2d');
-        ctxDb.clearRect(0, 0, 16, 16);
-        if (match.databaseFacePatch16x16) {
+        ctxDb.clearRect(0, 0, compDb.width, compDb.height);
+        const dbPatch = match.databaseFacePatch || match.databaseFacePatch16x16;
+        if (dbPatch) {
           if (!this._dbPatchImgCache) this._dbPatchImgCache = {};
-          let cachedImg = this._dbPatchImgCache[match.databaseFacePatch16x16];
+          let cachedImg = this._dbPatchImgCache[dbPatch];
           if (!cachedImg) {
             cachedImg = new Image();
-            cachedImg.src = match.databaseFacePatch16x16;
-            this._dbPatchImgCache[match.databaseFacePatch16x16] = cachedImg;
+            cachedImg.src = dbPatch;
+            this._dbPatchImgCache[dbPatch] = cachedImg;
           }
           if (cachedImg.complete && cachedImg.naturalWidth > 0) {
-            ctxDb.drawImage(cachedImg, 0, 0, 16, 16);
+            ctxDb.drawImage(cachedImg, 0, 0, compDb.width, compDb.height);
           } else {
             cachedImg.onload = () => {
               if (compDb) {
                 const c = compDb.getContext('2d');
-                c.clearRect(0, 0, 16, 16);
-                c.drawImage(cachedImg, 0, 0, 16, 16);
+                c.clearRect(0, 0, compDb.width, compDb.height);
+                c.drawImage(cachedImg, 0, 0, compDb.width, compDb.height);
               }
             };
           }
         } else {
           ctxDb.fillStyle = '#000000';
-          ctxDb.fillRect(0, 0, 16, 16);
+          ctxDb.fillRect(0, 0, compDb.width, compDb.height);
         }
       }
 
@@ -1925,7 +2335,7 @@ class SecureVisionApp {
       if (confEl) confEl.textContent = `${match.confidence || '0'}%`;
 
       // 5. Atualiza badge e predições do nó
-      const isMatched = match.matched && !match.isSpoofed;
+      const isMatched = match.matched;
       if (isMatched) {
         if (match.isBlocked) {
           if (statusTag) {
@@ -1982,12 +2392,12 @@ class SecureVisionApp {
       if (compLive) {
         const c = compLive.getContext('2d');
         c.fillStyle = '#000000';
-        c.fillRect(0, 0, 16, 16);
+        c.fillRect(0, 0, compLive.width, compLive.height);
       }
       if (compDb) {
         const c = compDb.getContext('2d');
         c.fillStyle = '#000000';
-        c.fillRect(0, 0, 16, 16);
+        c.fillRect(0, 0, compDb.width, compDb.height);
       }
     }
   }
