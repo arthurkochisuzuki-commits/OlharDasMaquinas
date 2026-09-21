@@ -196,6 +196,8 @@ class BiometricsEngine {
     this.identityHoldFrames = 0;
     this.MAX_IDENTITY_HOLD = 14; // ~1 segundo de buffer de retenção contra quedas por iluminação/óculos
     this.smoothedConfidence = 0;
+    this.lastFacePixels = 0;
+    this.minUnauthPercentage = parseFloat(localStorage.getItem('sv_min_unauth_percentage') || '60');
 
     this.smoothedBox = null;
     this.lastMatchResult = { matched: false, label: 'Buscando no banco...', confidence: 0 };
@@ -405,6 +407,7 @@ class BiometricsEngine {
       }
 
       isHumanFace = true;
+      this.lastFacePixels = facePixels;
       this.lastValidVideoBox = { x: vBoxX, y: vBoxY, width: vBoxW, height: vBoxH, detected: true, isTooFar };
     }
 
@@ -754,16 +757,26 @@ class BiometricsEngine {
     this.confirmedIdentity = null;
     this.smoothedConfidence = 0;
 
-    // DESCONHECIDO (RED ALERT) - Nunca atribui nome a alguém abaixo do limiar
+    // Cálculo da Certeza Biométrica da Face Atual:
+    const facePixelsCount = this.lastFacePixels || 55;
+    const livenessScore = (livenessResult && typeof livenessResult.score === 'number') ? livenessResult.score : 0.85;
+    const faceCertainty = Math.min(99, Math.max(25, Math.floor((facePixelsCount / 85) * 100 * livenessScore)));
+    
+    const minPercent = this.minUnauthPercentage || 60;
+    const showUnauth = faceCertainty >= minPercent;
+
+    // DESCONHECIDO (RED ALERT) - Só aciona o alerta quando atinge a porcentagem mínima configurada
     return {
       matched: false,
-      label: 'PESSOA NÃO CADASTRADA (DESCONHECIDO)',
+      label: showUnauth ? 'PESSOA NÃO CADASTRADA (DESCONHECIDO)' : `ANALISANDO ROSTO... (${faceCertainty}%)`,
       reason: `Similaridade (${maxCosine.toFixed(3)}) abaixo do limiar estrito ${this.SIMILARITY_THRESHOLD}`,
-      confidence: Math.max(0, (maxCosine * 100)).toFixed(1),
+      confidence: faceCertainty.toString(),
+      rawConfidence: faceCertainty,
       cosineSimilarity: maxCosine.toFixed(3),
       arcFaceMarginLogit: bestArcMargin ? bestArcMargin.scaledMarginLogit.toFixed(2) : '0.00',
       liveness: livenessResult,
-      profilesChecked: totalComparisons
+      profilesChecked: totalComparisons,
+      showUnauthAlert: showUnauth
     };
   }
 

@@ -121,6 +121,44 @@ class SecureVisionApp {
       });
     }
 
+    // Configuração de Porcentagem Mínima para Alerta de Pessoa Não Cadastrada
+    const minUnauthRange = document.getElementById('minUnauthPercentageRange');
+    const minUnauthVal = document.getElementById('minUnauthPercentageVal');
+    if (minUnauthRange) {
+      const savedMin = localStorage.getItem('sv_min_unauth_percentage') || '60';
+      minUnauthRange.value = savedMin;
+      if (minUnauthVal) minUnauthVal.textContent = `${savedMin}%`;
+      if (window.svBiometrics) window.svBiometrics.minUnauthPercentage = parseFloat(savedMin);
+
+      minUnauthRange.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (minUnauthVal) minUnauthVal.textContent = `${val}%`;
+        localStorage.setItem('sv_min_unauth_percentage', val);
+        if (window.svBiometrics) window.svBiometrics.minUnauthPercentage = parseFloat(val);
+      });
+    }
+
+    // Slider de Sensibilidade Geral (Tolerância ArcFace)
+    const sensRange = document.getElementById('sensitivityRange');
+    const sensVal = document.getElementById('sensitivityRangeVal');
+    if (sensRange) {
+      const savedSens = localStorage.getItem('sv_sensitivity_range') || '75';
+      sensRange.value = savedSens;
+      if (sensVal) sensVal.textContent = `${savedSens}%`;
+      if (window.svBiometrics) {
+        window.svBiometrics.SIMILARITY_THRESHOLD = (parseFloat(savedSens) / 100) * 0.77;
+      }
+
+      sensRange.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (sensVal) sensVal.textContent = `${val}%`;
+        localStorage.setItem('sv_sensitivity_range', val);
+        if (window.svBiometrics) {
+          window.svBiometrics.SIMILARITY_THRESHOLD = (parseFloat(val) / 100) * 0.77;
+        }
+      });
+    }
+
     // Theme Switcher (Escuro vs Claro)
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) {
@@ -730,6 +768,22 @@ class SecureVisionApp {
         badgeEl.style.color = '#f87171';
       }
       this.speakVoiceNotification('Atenção! Pessoa não cadastrada detectada na câmera!', 'unauth_voice');
+
+    } else if (statusState === 'ANALYZING') {
+      bannerEl.className = 'identity-status-banner';
+      if (iconEl) iconEl.textContent = '🔍';
+      if (titleEl) {
+        titleEl.textContent = `ANALISANDO ROSTO EM TEMPO REAL (${details && details.confidence ? details.confidence : 0}%)`;
+        titleEl.style.color = 'var(--accent-cyan)';
+      }
+      const minPercent = (window.svBiometrics && window.svBiometrics.minUnauthPercentage) || 60;
+      if (subEl) subEl.textContent = `Rosto em enquadramento. Aguardando confiança mínima configurada (${minPercent}%) para emissão de alertas.`;
+      if (badgeEl) {
+        badgeEl.textContent = 'ANALISANDO';
+        badgeEl.style.background = 'rgba(6,182,212,0.15)';
+        badgeEl.style.borderColor = 'rgba(6,182,212,0.4)';
+        badgeEl.style.color = '#06b6d4';
+      }
     }
   }
 
@@ -791,11 +845,13 @@ class SecureVisionApp {
                 currentStatus = 'SPOOF';
               } else if (match && match.matched) {
                 currentStatus = match.isBlocked ? 'BLOCKED' : 'AUTHORIZED';
+              } else if (match && match.showUnauthAlert === false) {
+                currentStatus = 'ANALYZING';
               }
 
               this.drawDynamicBoundingBox(ctx, box, match, feedConfig.id, trackingData.isolatedCanvas);
 
-              if (!primaryMatch || currentStatus === 'BLOCKED' || currentStatus === 'SPOOF' || (currentStatus === 'AUTHORIZED' && primaryStatus !== 'BLOCKED')) {
+              if (!primaryMatch || currentStatus === 'BLOCKED' || currentStatus === 'SPOOF' || (currentStatus === 'AUTHORIZED' && primaryStatus !== 'BLOCKED') || (currentStatus === 'UNAUTHORIZED' && primaryStatus === 'ANALYZING')) {
                 primaryMatch = match;
                 primaryStatus = currentStatus;
               }
@@ -867,6 +923,8 @@ class SecureVisionApp {
     const isMatched = match && match.matched && !isSpoofed && !isTooFar;
     const isBlocked = isMatched && match.isBlocked;
     const isAuthorized = isMatched && !match.isBlocked;
+    const isAnalyzing = !isMatched && !isTooFar && !isSpoofed && match && match.showUnauthAlert === false;
+    const minPercent = (window.svBiometrics && window.svBiometrics.minUnauthPercentage) || 60;
 
     let strokeColor = '#ef4444';
     let fillColor = 'rgba(239, 68, 68, 0.15)';
@@ -882,13 +940,16 @@ class SecureVisionApp {
     } else if (isSpoofed) {
       strokeColor = '#ff4444';
       fillColor = 'rgba(255, 68, 68, 0.35)';
+    } else if (isAnalyzing) {
+      strokeColor = '#06b6d4';
+      fillColor = 'rgba(6, 182, 212, 0.08)';
     }
 
     // Update Card UI Border
     const slotSuffix = camId === 'CAM_01' ? '1' : (camId === 'CAM_02' ? '2' : (camId === 'CAM_03' ? '3' : '4'));
     const cardEl = document.getElementById(`cardCam${slotSuffix}`);
     if (cardEl) {
-      if (isAuthorized) {
+      if (isAuthorized || isAnalyzing) {
         cardEl.classList.remove('alert-border');
       } else {
         cardEl.classList.add('alert-border');
@@ -958,14 +1019,22 @@ class SecureVisionApp {
           ? '⚠️ FRAUDE: FOTO ESTÁTICA DETECTADA'
           : (isAuthorized 
               ? `${match.name} [AUTORIZADO]` 
-              : (isBlocked ? `⛔ ${match.name} [ACESSO BLOQUEADO]` : (match.label || '🚨 RED ALERT - NÃO AUTORIZADO'))));
+              : (isBlocked 
+                  ? `⛔ ${match.name} [ACESSO BLOQUEADO]` 
+                  : (isAnalyzing 
+                      ? `🔍 ANALISANDO ROSTO... (${match.confidence || 0}%)` 
+                      : (match.label || '🚨 RED ALERT - NÃO AUTORIZADO')))));
     const subText = isTooFar
       ? 'Aproxime-se para identificação'
       : (isSpoofed
           ? 'SPOOFING / LIVENESS REJEITADO (0.0%)'
           : (isAuthorized 
               ? `Confiança: ${match.confidence}%` 
-              : (isBlocked ? `LISTA NEGRA / ALERTA CRÍTICO (${match.confidence}%)` : 'Rosto Ausente no Banco DB')));
+              : (isBlocked 
+                  ? `LISTA NEGRA / ALERTA CRÍTICO (${match.confidence}%)` 
+                  : (isAnalyzing 
+                      ? `Aguardando confiança mínima (${minPercent}%)` 
+                      : `Confiança: ${match.confidence}% - Pessoa Não Cadastrada`))));
 
     ctx.font = 'bold 11px JetBrains Mono, monospace';
     const textWidth = ctx.measureText(labelText).width;
@@ -974,7 +1043,7 @@ class SecureVisionApp {
     const labelX = box.x + (box.width - labelW) / 2;
     const labelY = Math.max(10, box.y - labelH - 6);
 
-    ctx.fillStyle = isTooFar ? '#78350f' : (isAuthorized ? '#0f172a' : (isBlocked ? '#7f1d1d' : '#991b1b'));
+    ctx.fillStyle = isTooFar ? '#78350f' : (isAuthorized ? '#0f172a' : (isBlocked ? '#7f1d1d' : (isAnalyzing ? '#0f172a' : '#991b1b')));
     ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1;
     ctx.fillRect(labelX, labelY, labelW, labelH);
@@ -985,7 +1054,7 @@ class SecureVisionApp {
     ctx.fillText(labelText, labelX + labelW / 2, labelY + 15);
 
     ctx.font = '9px Inter, sans-serif';
-    ctx.fillStyle = isTooFar ? '#fcd34d' : (isAuthorized ? '#10b981' : (isBlocked ? '#ff8585' : '#f87171'));
+    ctx.fillStyle = isTooFar ? '#fcd34d' : (isAuthorized ? '#10b981' : (isBlocked ? '#ff8585' : (isAnalyzing ? '#06b6d4' : '#f87171')));
     ctx.fillText(subText, labelX + labelW / 2, labelY + 28);
 
     // 4. Biometric HUD: Exibe a Face 100% Isolada com Fundo Preto no canto superior da câmera
@@ -1007,7 +1076,7 @@ class SecureVisionApp {
       // Badge do HUD
       ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
       ctx.fillRect(hudX, hudY + hudSize - 16, hudSize, 16);
-      ctx.fillStyle = isAuthorized ? '#10b981' : (isBlocked ? '#ef4444' : '#f87171');
+      ctx.fillStyle = isAuthorized ? '#10b981' : (isBlocked ? '#ef4444' : (isAnalyzing ? '#06b6d4' : '#f87171'));
       ctx.font = 'bold 8px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
       ctx.fillText('FUNDO PRETO', hudX + hudSize / 2, hudY + hudSize - 5);

@@ -457,8 +457,9 @@ body {
   right: 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   z-index: 5;
+  pointer-events: none;
 }
 
 .cam-tag {
