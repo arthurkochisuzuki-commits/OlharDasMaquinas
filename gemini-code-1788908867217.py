@@ -16,6 +16,14 @@ import numpy as np
 import os
 import json
 import time
+import sys
+
+# Garante suporte UTF-8 no terminal Windows para emojis e acentos
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 # ==============================================================================
 # CONFIGURAÇÕES DO SISTEMA
@@ -253,13 +261,38 @@ class MotorBiometricoLocal:
 
         for nome, dados in self.perfis.items():
             vetores_cadastrados = dados.get("vetores", [])
-            for v_cad in vetores_cadastrados:
-                v_cad_arr = np.array(v_cad, dtype=np.float32)
-                # Similaridade de cosseno: dot(A, B)
-                cos_sim = float(np.dot(vetor_atual, v_cad_arr))
-                if cos_sim > maior_cosseno:
-                    maior_cosseno = cos_sim
-                    melhor_match = nome
+            if not vetores_cadastrados:
+                continue
+
+            arr_vetores = np.array(vetores_cadastrados, dtype=np.float32)
+
+            # 1. Centróide Ponderado do perfil normalizado em L2
+            centroide = np.mean(arr_vetores, axis=0)
+            norma_c = np.linalg.norm(centroide)
+            if norma_c > 0:
+                centroide = centroide / norma_c
+            centroid_sim = float(np.dot(vetor_atual, centroide))
+
+            # 2. Similaridades individuais com todos os protótipos
+            sims = np.dot(arr_vetores, vetor_atual)
+            sims_ordenadas = np.sort(sims)[::-1]
+
+            # 3. Média dos K melhores protótipos (Anti-Overfitting: elimina anomalias individuais)
+            k = min(3, len(sims_ordenadas))
+            topk_sim = float(np.mean(sims_ordenadas[:k]))
+
+            # 4. Escore Consensual Ponderado (55% Top-K + 45% Centróide)
+            consensus_sim = (topk_sim * 0.55) + (centroid_sim * 0.45)
+
+            # 5. Filtro de Coerência Anatômica (Anti-Falsos Positivos em Desconhecidos)
+            # Se um desconhecido tiver alinhamento acidental com 1 vetor mas baixa correlação com o centróide,
+            # reduz a pontuação para evitar que excesso de imagens cause falsos positivos.
+            if len(sims_ordenadas) > 0 and (sims_ordenadas[0] - centroid_sim > 0.25):
+                consensus_sim = min(consensus_sim, centroid_sim + 0.08)
+
+            if consensus_sim > maior_cosseno:
+                maior_cosseno = consensus_sim
+                melhor_match = nome
 
         # Verificação do limiar estrito (Open-Set Recognition)
         if maior_cosseno >= SIMILARITY_THRESHOLD and melhor_match:
@@ -278,13 +311,119 @@ class MotorBiometricoLocal:
                 "confianca": max(0.0, maior_cosseno * 100)
             }
 
+    def gerar_aumentos_biometricos(self, face_isolada):
+        """
+        Data Augmentation Biométrico (Aumento de Dados de Face):
+        Gera variações realistas a partir do rosto isolado para enriquecer o banco de dados:
+        1. Original
+        2. Espelhamento Horizontal (Inversão no eixo X com cv2.flip)
+        3. Rotação Horária (+5 graus)
+        4. Rotação Anti-horária (-5 graus)
+        5. Variação de Iluminação Alta (+18%)
+        6. Variação de Iluminação Baixa (-15%)
+        7. Espelhamento Horizontal com Iluminação (+12%)
+        8. Espelhamento Horizontal com Rotação (-4 graus)
+        """
+        aumentados = [("ORIGINAL", face_isolada)]
+        h, w = face_isolada.shape[:2]
+        centro = (w // 2, h // 2)
+
+        # 1. Espelhamento Horizontal (Inversão no eixo X)
+        espelho = cv2.flip(face_isolada, 1)
+        aumentados.append(("ESPELHAMENTO_HORIZONTAL", espelho))
+
+        # 2. Rotações Leves (-5° e +5°)
+        for angulo in [-5, 5]:
+            mat = cv2.getRotationMatrix2D(centro, angulo, 1.0)
+            rot = cv2.warpAffine(face_isolada, mat, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+            aumentados.append((f"ROTACAO_{angulo:+d}DEG", rot))
+
+        # 3. Variações de Iluminação (apenas pixels da face, preservando fundo preto)
+        mascara_face = (face_isolada > 0).astype(np.uint8)
+        brilho_alto = np.clip(face_isolada.astype(np.float32) * 1.18 + 10, 0, 255).astype(np.uint8) * mascara_face
+        brilho_baixo = np.clip(face_isolada.astype(np.float32) * 0.85 - 8, 0, 255).astype(np.uint8) * mascara_face
+        aumentados.append(("ILUMINACAO_ALTA_+18%", brilho_alto))
+        aumentados.append(("ILUMINACAO_BAIXA_-15%", brilho_baixo))
+
+        # 4. Combinações com Espelho (Espelho + Luz e Espelho + Rotação)
+        mascara_espelho = (espelho > 0).astype(np.uint8)
+        espelho_luz = np.clip(espelho.astype(np.float32) * 1.12 + 6, 0, 255).astype(np.uint8) * mascara_espelho
+        aumentados.append(("ESPELHO_ILUMINACAO", espelho_luz))
+
+        mat_esp_rot = cv2.getRotationMatrix2D(centro, -4, 1.0)
+        espelho_rot = cv2.warpAffine(espelho, mat_esp_rot, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0))
+        aumentados.append(("ESPELHO_ROTACAO_-4DEG", espelho_rot))
+
+        return aumentados
+
+    def regularizar_vetores(self, vetores, max_prototipos=12):
+        """
+        Regularização e Poda Biometria (Anti-Overfitting):
+        Elimina ruídos/outliers e duplicatas redundantes, limitando o perfil
+        aos K protótipos de maior qualidade e representatividade.
+        """
+        if not vetores or len(vetores) <= 1:
+            return vetores
+
+        arr = np.array(vetores, dtype=np.float32)
+        # Normalização individual
+        normas = np.linalg.norm(arr, axis=1, keepdims=True)
+        normas[normas == 0] = 1.0
+        arr = arr / normas
+
+        # Centróide global
+        centroide = np.mean(arr, axis=0)
+        norma_c = np.linalg.norm(centroide)
+        if norma_c > 0:
+            centroide = centroide / norma_c
+
+        # Filtro de Coerência Anatômica (Poda de Outliers)
+        sim_centroide = np.dot(arr, centroide)
+        validos_idx = np.where(sim_centroide >= 0.52)[0]
+        if len(validos_idx) == 0:
+            return [centroide.tolist()]
+
+        # Ordena pela proximidade com o centróide
+        arr_filtrado = arr[validos_idx]
+        sim_filtrado = sim_centroide[validos_idx]
+        ordem = np.argsort(sim_filtrado)[::-1]
+        arr_ordenado = arr_filtrado[ordem]
+
+        # Deduplicação e Diversidade (Cosine Non-Maximum Suppression)
+        selecionados = []
+        for v in arr_ordenado:
+            redundante = False
+            for s in selecionados:
+                if float(np.dot(v, s)) > 0.985:
+                    redundante = True
+                    break
+            if not redundante:
+                selecionados.append(v)
+                if len(selecionados) >= max_prototipos:
+                    break
+
+        return [v.tolist() for v in selecionados]
+
     def cadastrar_usuario(self, nome, face_isolada):
-        vetor = self.extrair_vetor(face_isolada)
+        amostras = self.gerar_aumentos_biometricos(face_isolada)
         if nome not in self.perfis:
             self.perfis[nome] = {"vetores": []}
-        self.perfis[nome]["vetores"].append(vetor)
+
+        # Coleta vetores existentes e novos gerados pelo Data Augmentation
+        candidatos = list(self.perfis[nome].get("vetores", []))
+        for tipo, img in amostras:
+            v = self.extrair_vetor(img)
+            candidatos.append(v)
+
+        # Aplica a Poda e Regularização Anti-Overfitting (mantém os melhores protótipos)
+        vetores_refinados = self.regularizar_vetores(candidatos, max_prototipos=12)
+        self.perfis[nome]["vetores"] = vetores_refinados
+
         self.salvar_banco()
-        print(f"✅ Usuário '{nome}' cadastrado com sucesso com vetor da face isolada!")
+        print(f"✅ Usuário '{nome}' cadastrado com sucesso!")
+        print(f"   🧬 Data Augmentation & Anti-Overfitting Ativos:")
+        print(f"      - Amostras geradas: {len(amostras)} variações (Espelho Horizontal, Rotações e Luz)")
+        print(f"      - Protótipos refinados no banco: {len(vetores_refinados)} vetores de alta fidelidade (sem overfitting).")
 
 
 # ==============================================================================
