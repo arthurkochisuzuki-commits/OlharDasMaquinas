@@ -1,0 +1,21 @@
+# ==============================================================================
+# SECUREVISION AI (OlharDasMaquinas) - DEPENDÊNCIAS PYTHON
+# ==============================================================================
+# Instale via terminal: pip install -r requirements.txt
+# Ou simplesmente execute o arquivo: instalar_dependencias.bat
+# ==============================================================================
+
+# 1. Visão Computacional e Captura de Câmera (Essencial)
+opencv-python>=4.8.0
+
+# 2. Processamento Numérico e Vetores Biométricos (Essencial)
+numpy>=1.24.0
+
+# ------------------------------------------------------------------------------
+# 3. DETECÇÃO NEURAL AVANÇADA (Opcional - YOLOv8)
+# O sistema possui fallback anatômico inteligente: se a biblioteca abaixo
+# NÃO estiver instalada, o código utiliza automaticamente os classificadores
+# neurais do OpenCV, funcionando perfeitamente em qualquer computador!
+# Descomente a linha abaixo apenas se desejar usar os pesos do YOLOv8:
+# ------------------------------------------------------------------------------
+# ultralytics>=8.0.0
